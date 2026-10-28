@@ -78,6 +78,11 @@ class _QuizScreenState extends State<QuizScreen>
       final gloss = useFirst ? pair.example.firstGloss : pair.example.secondGloss;
       final note = useFirst ? pair.example.firstNote : pair.example.secondNote;
 
+      // 例句里没有目标词就出不了填空题，跳过这一组（用户自建的可能没填例句）。
+      if (!sentence.toLowerCase().contains(answer.toLowerCase())) {
+        continue;
+      }
+
       final options = <String>[answer, other]..shuffle(random);
 
       items.add(

@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 
 import 'data/sample_data.dart';
+import 'screens/add_pair_screen.dart';
 import 'screens/detail_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/quiz_screen.dart';
@@ -26,6 +27,7 @@ class PreviewApp extends StatelessWidget {
       'quiz' => QuizScreen(pairs: samplePairs),
       'quiz-right' => QuizScreen(pairs: samplePairs, previewAnswer: 'right'),
       'quiz-wrong' => QuizScreen(pairs: samplePairs, previewAnswer: 'wrong'),
+      'add' => const AddPairScreen(),
       _ => const HomeScreen(pairs: samplePairs),
     };
 

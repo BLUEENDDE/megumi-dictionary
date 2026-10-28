@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../models/word_pair.dart';
 import '../services/progress_store.dart';
+import '../services/user_pairs_store.dart';
 import '../widgets/ui_kit.dart';
+import 'add_pair_screen.dart';
 import 'detail_screen.dart';
 import 'quiz_screen.dart';
 
@@ -16,34 +18,103 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final ProgressStore _store = ProgressStore();
+  final ProgressStore _progress = ProgressStore();
+  final UserPairsStore _userPairs = UserPairsStore();
+  final TextEditingController _search = TextEditingController();
+
+  String _query = '';
 
   @override
   void initState() {
     super.initState();
-    _store.load().then((_) {
-      if (mounted) setState(() {});
-    });
+    _load();
+  }
+
+  Future<void> _load() async {
+    await Future.wait([_progress.load(), _userPairs.load()]);
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  List<WordPair> get _allPairs => [..._userPairs.pairs, ...widget.pairs];
+
+  List<WordPair> get _visiblePairs {
+    if (_query.isEmpty) return _allPairs;
+    final q = _query.toLowerCase();
+    return _allPairs.where((pair) {
+      return pair.first.form.toLowerCase().contains(q) ||
+          pair.second.form.toLowerCase().contains(q) ||
+          pair.summary.toLowerCase().contains(q) ||
+          pair.tag.toLowerCase().contains(q);
+    }).toList();
   }
 
   Future<void> _openQuiz(List<WordPair> pairs) async {
+    if (pairs.isEmpty) return;
     await Navigator.of(context).push(
-      fadeUpRoute(QuizScreen(pairs: pairs, store: _store)),
+      fadeUpRoute(QuizScreen(pairs: pairs, store: _progress)),
     );
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _addPair() async {
+    final created = await Navigator.of(context).push<WordPair>(
+      fadeUpRoute(const AddPairScreen()),
+    );
+    if (created == null) return;
+    await _userPairs.add(created);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _deletePair(WordPair pair) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('删除这组词对？'),
+        content: Text('${pair.first.form} / ${pair.second.form} 会被删掉，不能恢复。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('算了'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('删除', style: TextStyle(color: Color(0xFFC2453E))),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _userPairs.remove(pair.id);
     if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final scheme = Theme.of(context).colorScheme;
     const ink = Color(0xFF1C1B18);
     const muted = Color(0xFF6B6A63);
+    final visible = _visiblePairs;
 
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _addPair,
+        backgroundColor: scheme.primary,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add_rounded, size: 20),
+        label: const Text(
+          '添加词对',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+        ),
+      ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),
           children: [
             const Text(
               'INDONESIAN · 辨析',
@@ -73,11 +144,18 @@ class _HomeScreenState extends State<HomeScreen> {
             _ReviewBanner(
               subtitle: _bannerSubtitle(),
               color: scheme.primary,
-              onTap: () => _openQuiz(widget.pairs),
+              onTap: () => _openQuiz(_allPairs),
             ),
             const SizedBox(height: 12),
-            _StatsRow(store: _store),
-            const SizedBox(height: 24),
+            _StatsRow(store: _progress, userCount: _userPairs.pairs.length),
+            if (_allPairs.length > 4) ...[
+              const SizedBox(height: 18),
+              _SearchBox(
+                controller: _search,
+                onChanged: (value) => setState(() => _query = value.trim()),
+              ),
+            ],
+            const SizedBox(height: 22),
             Row(
               children: [
                 const Text(
@@ -90,26 +168,41 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '${widget.pairs.length} 组',
+                  '${visible.length} 组',
                   style: const TextStyle(fontSize: 13, color: muted),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            for (final pair in widget.pairs)
+            if (visible.isEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 34),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  '没有匹配的词对',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF9A988F)),
+                ),
+              ),
+            for (final pair in visible)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: _PairCard(
                   pair: pair,
-                  stat: _store.statFor(pair.id),
+                  stat: _progress.statFor(pair.id),
                   onTap: () async {
                     await Navigator.of(context).push(
                       fadeUpRoute(
-                        DetailScreen(pair: pair, store: _store),
+                        DetailScreen(pair: pair, store: _progress),
                       ),
                     );
                     if (mounted) setState(() {});
                   },
+                  onLongPress:
+                      pair.isUserMade ? () => _deletePair(pair) : null,
                 ),
               ),
           ],
@@ -119,18 +212,52 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _bannerSubtitle() {
-    if (!_store.isLoaded) return '${widget.pairs.length} 组词对';
-    if (_store.todayCount == 0) {
-      return '${widget.pairs.length} 组词对 · 约两分钟';
+    if (!_progress.isLoaded) return '${_allPairs.length} 组词对';
+    if (_progress.todayCount == 0) {
+      return '${_allPairs.length} 组词对 · 约两分钟';
     }
-    return '今天已练 ${_store.todayCount} 题 · 继续加油';
+    return '今天已练 ${_progress.todayCount} 题 · 继续加油';
+  }
+}
+
+class _SearchBox extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  const _SearchBox({required this.controller, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      style: const TextStyle(fontSize: 14, color: Color(0xFF1C1B18)),
+      decoration: InputDecoration(
+        hintText: '搜词或关键词',
+        hintStyle: const TextStyle(fontSize: 13.5, color: Color(0xFFB0ADA3)),
+        prefixIcon: const Icon(
+          Icons.search_rounded,
+          size: 19,
+          color: Color(0xFF9A988F),
+        ),
+        isDense: true,
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(vertical: 13),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
   }
 }
 
 class _StatsRow extends StatelessWidget {
   final ProgressStore store;
+  final int userCount;
 
-  const _StatsRow({required this.store});
+  const _StatsRow({required this.store, required this.userCount});
 
   @override
   Widget build(BuildContext context) {
@@ -143,11 +270,11 @@ class _StatsRow extends StatelessWidget {
       child: Row(
         children: [
           _Stat(label: '练过', value: '${store.trainedPairs} 组'),
-          const SizedBox(width: 20),
-          _Stat(label: '总正确率', value: '${store.overallAccuracy}%'),
+          const SizedBox(width: 18),
+          _Stat(label: '正确率', value: '${store.overallAccuracy}%'),
           const Spacer(),
           Text(
-            store.todayCount == 0 ? '今天还没练' : '今天 ${store.todayCount} 题',
+            userCount == 0 ? '自建 0 组' : '自建 $userCount 组',
             style: const TextStyle(fontSize: 12, color: muted),
           ),
         ],
@@ -261,11 +388,13 @@ class _PairCard extends StatelessWidget {
   final WordPair pair;
   final PairStat stat;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   const _PairCard({
     required this.pair,
     required this.stat,
     required this.onTap,
+    this.onLongPress,
   });
 
   @override
@@ -280,6 +409,7 @@ class _PairCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
           child: Row(
