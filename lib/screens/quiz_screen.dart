@@ -10,7 +10,10 @@ enum _OptionState { idle, correct, wrong, dim }
 class QuizScreen extends StatefulWidget {
   final List<WordPair> pairs;
 
-  const QuizScreen({super.key, required this.pairs});
+  /// 仅用于截图预览：right = 自动选对，wrong = 自动选错。正式使用留空。
+  final String? previewAnswer;
+
+  const QuizScreen({super.key, required this.pairs, this.previewAnswer});
 
   @override
   State<QuizScreen> createState() => _QuizScreenState();
@@ -34,6 +37,17 @@ class _QuizScreenState extends State<QuizScreen>
       vsync: this,
       duration: const Duration(milliseconds: 420),
     );
+
+    final preview = widget.previewAnswer;
+    if (preview != null && _items.isNotEmpty) {
+      final first = _items.first;
+      final target = preview == 'right'
+          ? first.answer
+          : first.options.firstWhere((o) => o != first.answer);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _choose(target);
+      });
+    }
   }
 
   @override
@@ -262,7 +276,19 @@ class _QuizScreenState extends State<QuizScreen>
                               scheme: scheme,
                             ),
                           )
-                        : const SizedBox.shrink(),
+                        : Padding(
+                            key: const ValueKey('hint'),
+                            padding: const EdgeInsets.only(top: 16),
+                            child: Text(
+                              '想不起来也没关系，选完会告诉你这两个词差在哪。',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 12,
+                                height: 1.6,
+                                color: const Color(0xFF9A988F),
+                              ),
+                            ),
+                          ),
                   ),
                 ],
               ),
