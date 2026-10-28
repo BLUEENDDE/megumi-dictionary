@@ -1,8 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:indonesia_vocab/main.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   testWidgets('首页能渲染，并列出词对', (WidgetTester tester) async {
     await tester.pumpWidget(const VocabApp());
     await tester.pumpAndSettle();
@@ -11,5 +16,6 @@ void main() {
     expect(find.text('开始复习'), findsOneWidget);
     expect(find.text('besar'), findsWidgets);
     expect(find.text('luas'), findsWidgets);
+    expect(find.text('还没练过'), findsWidgets);
   });
 }

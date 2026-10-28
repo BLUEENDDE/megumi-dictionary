@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../models/word_pair.dart';
+import '../services/progress_store.dart';
 import '../widgets/ui_kit.dart';
 import 'quiz_screen.dart';
 
 class DetailScreen extends StatelessWidget {
   final WordPair pair;
+  final ProgressStore store;
 
-  const DetailScreen({super.key, required this.pair});
+  const DetailScreen({super.key, required this.pair, required this.store});
 
   @override
   Widget build(BuildContext context) {
@@ -121,7 +123,7 @@ class DetailScreen extends StatelessWidget {
             ),
             onPressed: () {
               Navigator.of(context).push(
-                fadeUpRoute(QuizScreen(pairs: [pair])),
+                fadeUpRoute(QuizScreen(pairs: [pair], store: store)),
               );
             },
             icon: const Icon(Icons.bolt_rounded, size: 20),

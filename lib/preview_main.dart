@@ -7,6 +7,7 @@ import 'data/sample_data.dart';
 import 'screens/detail_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/quiz_screen.dart';
+import 'services/progress_store.dart';
 
 void main() {
   runApp(const PreviewApp());
@@ -18,9 +19,10 @@ class PreviewApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final screen = Uri.base.queryParameters['screen'] ?? 'home';
+    final store = ProgressStore()..load();
 
     final Widget home = switch (screen) {
-      'detail' => DetailScreen(pair: samplePairs.first),
+      'detail' => DetailScreen(pair: samplePairs.first, store: store),
       'quiz' => QuizScreen(pairs: samplePairs),
       'quiz-right' => QuizScreen(pairs: samplePairs, previewAnswer: 'right'),
       'quiz-wrong' => QuizScreen(pairs: samplePairs, previewAnswer: 'wrong'),

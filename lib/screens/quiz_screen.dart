@@ -4,16 +4,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/word_pair.dart';
+import '../services/progress_store.dart';
 
 enum _OptionState { idle, correct, wrong, dim }
 
 class QuizScreen extends StatefulWidget {
   final List<WordPair> pairs;
+  final ProgressStore? store;
 
   /// 仅用于截图预览：right = 自动选对，wrong = 自动选错。正式使用留空。
   final String? previewAnswer;
 
-  const QuizScreen({super.key, required this.pairs, this.previewAnswer});
+  const QuizScreen({
+    super.key,
+    required this.pairs,
+    this.store,
+    this.previewAnswer,
+  });
 
   @override
   State<QuizScreen> createState() => _QuizScreenState();
@@ -108,6 +115,8 @@ class _QuizScreenState extends State<QuizScreen>
       _selected = option;
       if (isRight) _correct++;
     });
+
+    widget.store?.record(item.pair.id, isRight);
 
     if (isRight) {
       HapticFeedback.lightImpact();
