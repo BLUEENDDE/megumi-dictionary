@@ -32,7 +32,11 @@ class HomeScreenState extends State<HomeScreen> {
   String _query = '';
   List<DictEntry> _searchResults = const [];
 
-  int _limit = 50;
+  /// 列表显示多少页（每页 = 当前「每组词数」）
+  int _pages = 1;
+
+  int get _displayCount =>
+      SettingsStore.learnBatch.value.clamp(1, 100) * _pages;
 
   List<DictEntry>? _levelCache;
   String? _levelCacheKey;
@@ -250,7 +254,7 @@ class HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
     setState(() {
       _levelCache = null;
-      _limit = 50;
+      _pages = 1;
       _recount();
     });
   }
@@ -268,7 +272,11 @@ class HomeScreenState extends State<HomeScreen> {
 
   Future<void> _openLearnSettings() async {
     await Navigator.of(context).push(fadeUpRoute(const LearnSettingsScreen()));
-    if (mounted) setState(_recount);
+    if (!mounted) return;
+    setState(() {
+      _pages = 1;
+      _recount();
+    });
   }
 
   void _openFamily(String word) {
@@ -287,7 +295,7 @@ class HomeScreenState extends State<HomeScreen> {
     final mastered = _masteredCount;
     final due = _dueCount;
     final total = _levelWords.length;
-    final words = _levelWords.take(_limit).toList();
+    final words = _levelWords.take(_displayCount).toList();
 
     return Scaffold(
       body: SafeArea(
@@ -440,7 +448,7 @@ class HomeScreenState extends State<HomeScreen> {
                   padding: const EdgeInsets.only(top: 6),
                   child: Center(
                     child: TextButton(
-                      onPressed: () => setState(() => _limit += 50),
+                      onPressed: () => setState(() => _pages += 1),
                       child: Text(
                         '加载更多',
                         style: TextStyle(fontSize: 13, color: p.primary),
