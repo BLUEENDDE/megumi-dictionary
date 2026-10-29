@@ -166,7 +166,7 @@ class HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'INDONESIAN · 背词',
+                        'MEGUMI · 辞書',
                         style: TextStyle(
                           fontSize: 11,
                           letterSpacing: 1.6,

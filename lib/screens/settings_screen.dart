@@ -378,11 +378,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _Card(
             child: Column(
               children: [
+                _InfoRow(label: '名称', value: 'megumi辞書'),
+                const SizedBox(height: 10),
                 _InfoRow(label: '自建词对', value: '${widget.userPairs.pairs.length} 组'),
                 const SizedBox(height: 10),
                 _InfoRow(label: '已掌握', value: '${widget.progress.trainedPairs} 组'),
                 const SizedBox(height: 10),
-                _InfoRow(label: '版本', value: '1.2.0'),
+                _InfoRow(label: '版本', value: '1.3.0'),
               ],
             ),
           ),
