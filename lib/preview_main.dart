@@ -14,6 +14,7 @@ import 'screens/learned_list_screen.dart';
 import 'screens/quiz_screen.dart';
 import 'screens/root_shell.dart';
 import 'screens/settings_screen.dart';
+import 'screens/text_import_screen.dart';
 import 'services/progress_store.dart';
 import 'services/user_pairs_store.dart';
 import 'theme/palette.dart';
@@ -56,6 +57,7 @@ class PreviewApp extends StatelessWidget {
           store: progress,
         ),
       'settings' => SettingsScreen(progress: progress, userPairs: userPairs),
+      'import' => TextImportScreen(userPairs: userPairs),
       _ => screen == 'shell'
           ? const RootShell(pairs: samplePairs)
           : HomeScreen(

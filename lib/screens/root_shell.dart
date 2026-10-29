@@ -104,9 +104,9 @@ class _RootShellState extends State<RootShell> {
             label: '背词',
           ),
           NavigationDestination(
-            icon: Icon(Icons.settings_outlined, color: p.muted),
-            selectedIcon: Icon(Icons.settings_rounded, color: p.primary),
-            label: '设置',
+            icon: Icon(Icons.person_outline_rounded, color: p.muted),
+            selectedIcon: Icon(Icons.person_rounded, color: p.primary),
+            label: '我的',
           ),
         ],
       ),

@@ -6,7 +6,6 @@ import '../services/settings_store.dart';
 import '../services/user_pairs_store.dart';
 import '../theme/palette.dart';
 import '../widgets/ui_kit.dart';
-import 'add_pair_screen.dart';
 import 'detail_screen.dart';
 import 'learn_session_screen.dart';
 import 'learned_list_screen.dart';
@@ -109,15 +108,6 @@ class HomeScreenState extends State<HomeScreen> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _addPair() async {
-    final created = await Navigator.of(context).push<WordPair>(
-      fadeUpRoute(const AddPairScreen()),
-    );
-    if (created == null) return;
-    await _userPairs.add(created);
-    if (mounted) setState(() {});
-  }
-
   Future<void> _deletePair(WordPair pair) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -164,16 +154,6 @@ class HomeScreenState extends State<HomeScreen> {
             : null;
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _addPair,
-        backgroundColor: p.primary,
-        foregroundColor: context.isDark ? const Color(0xFF10231F) : Colors.white,
-        icon: const Icon(Icons.add_rounded, size: 20),
-        label: const Text(
-          '添加词对',
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-        ),
-      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),

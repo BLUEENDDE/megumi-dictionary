@@ -7,6 +7,7 @@ import '../services/progress_store.dart';
 import '../services/settings_store.dart';
 import '../services/user_pairs_store.dart';
 import '../theme/palette.dart';
+import 'text_import_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final ProgressStore progress;
@@ -224,7 +225,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 icon: const Icon(Icons.arrow_back_rounded),
                 onPressed: () => Navigator.of(context).maybePop(),
               ),
-        title: const Text('设置'),
+        title: const Text('我的'),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
@@ -272,6 +273,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
           ),
           const SizedBox(height: 24),
+          const _SectionTitle('词库'),
+          _Card(
+            child: Column(
+              children: [
+                _Tile(
+                  icon: Icons.add_circle_outline_rounded,
+                  title: '添加单词',
+                  subtitle: '一行一组词对，粘贴文本批量录入',
+                  onTap: () async {
+                    final added = await Navigator.of(context).push<int>(
+                      MaterialPageRoute(
+                        builder: (_) => TextImportScreen(
+                          userPairs: widget.userPairs,
+                        ),
+                      ),
+                    );
+                    if (!mounted) return;
+                    if (added != null && added > 0) {
+                      setState(() {});
+                      _toast('已添加 $added 组词对');
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
           const _SectionTitle('数据'),
           _Card(
             child: Column(
@@ -309,7 +337,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 10),
                 _InfoRow(label: '已掌握', value: '${widget.progress.trainedPairs} 组'),
                 const SizedBox(height: 10),
-                _InfoRow(label: '版本', value: '0.7.0'),
+                _InfoRow(label: '版本', value: '1.1.0'),
               ],
             ),
           ),
