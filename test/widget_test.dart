@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:indonesia_vocab/screens/home_screen.dart';
 import 'package:indonesia_vocab/services/progress_store.dart';
-import 'package:indonesia_vocab/services/user_pairs_store.dart';
 import 'package:indonesia_vocab/theme/palette.dart';
 
 void main() {
@@ -16,11 +15,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: buildTheme(Palette.light, Brightness.light),
-        home: HomeScreen(
-          pairs: const [],
-          progress: ProgressStore(),
-          userPairs: UserPairsStore(),
-        ),
+        home: HomeScreen(progress: ProgressStore()),
       ),
     );
     await tester.pump(const Duration(milliseconds: 300));

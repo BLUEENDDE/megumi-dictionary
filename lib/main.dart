@@ -24,7 +24,7 @@ class VocabApp extends StatelessWidget {
           theme: buildTheme(Palette.light, Brightness.light),
           darkTheme: buildTheme(Palette.dark, Brightness.dark),
           themeMode: mode,
-          home: const RootShell(pairs: []),
+          home: const RootShell(),
         );
       },
     );

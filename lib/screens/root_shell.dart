@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../models/word_pair.dart';
 import '../services/dictionary.dart';
 import '../services/progress_store.dart';
 import '../services/user_pairs_store.dart';
@@ -10,9 +9,8 @@ import 'settings_screen.dart';
 
 /// 底部两个页签：背词 / 设置。左右滑动也能切。
 class RootShell extends StatefulWidget {
-  final List<WordPair> pairs;
 
-  const RootShell({super.key, required this.pairs});
+  const RootShell({super.key});
 
   @override
   State<RootShell> createState() => _RootShellState();
@@ -79,9 +77,7 @@ class _RootShellState extends State<RootShell> {
         children: [
           HomeScreen(
             key: _homeKey,
-            pairs: widget.pairs,
             progress: _progress,
-            userPairs: _userPairs,
           ),
           SettingsScreen(
             progress: _progress,

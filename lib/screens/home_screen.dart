@@ -1,32 +1,23 @@
 import 'package:flutter/material.dart';
 
-import '../models/word_pair.dart';
 import '../services/dictionary.dart';
+import '../services/family_index.dart';
 import '../services/progress_store.dart';
 import '../services/settings_store.dart';
-import '../services/user_pairs_store.dart';
 import '../theme/palette.dart';
 import '../widgets/dict_entry_sheet.dart';
 import '../widgets/ui_kit.dart';
-import 'detail_screen.dart';
+import 'family_screen.dart';
 import 'learn_settings_screen.dart';
-import 'learned_list_screen.dart';
-import 'quiz_screen.dart';
 import 'word_quiz_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  final List<WordPair> pairs;
   final ProgressStore progress;
-  final UserPairsStore userPairs;
-
-  /// 预览用：带一个初始查询进来。
   final String? initialQuery;
 
   const HomeScreen({
     super.key,
-    required this.pairs,
     required this.progress,
-    required this.userPairs,
     this.initialQuery,
   });
 
@@ -39,16 +30,17 @@ class HomeScreenState extends State<HomeScreen> {
   final PageController _cards = PageController();
 
   String _query = '';
-  List<DictEntry> _dictResults = const [];
+  List<DictEntry> _searchResults = const [];
 
-  /// 点过「新学」之后才展示列表。
-  bool _showPairs = false;
-
-  /// 词典列表一次加载多少条。
   int _limit = 50;
 
+  List<DictEntry>? _levelCache;
+  String? _levelCacheKey;
+  int? _cLearned;
+  int? _cMastered;
+  int? _cDue;
+
   ProgressStore get _progress => widget.progress;
-  UserPairsStore get _userPairs => widget.userPairs;
 
   @override
   void initState() {
@@ -60,7 +52,9 @@ class HomeScreenState extends State<HomeScreen> {
         _search.text = initial;
         _onSearch(initial);
       }
-      setState(() {});
+      // 词典刚加载完，之前缓存的空列表要作废
+      _levelCache = null;
+      setState(_recount);
     });
   }
 
@@ -71,62 +65,37 @@ class HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  /// 从别的页面回来后刷新。
+  void refresh() {
+    if (mounted) setState(_recount);
+  }
+
+  void _recount() {
+    _cLearned = null;
+    _cMastered = null;
+    _cDue = null;
+  }
+
   void _onSearch(String value) {
     final q = value.trim();
     setState(() {
       _query = q;
-      _dictResults = q.isEmpty ? const [] : Dictionary.search(q, limit: 20);
+      _searchResults = q.isEmpty ? const [] : Dictionary.search(q, limit: 30);
     });
   }
 
-  // ---------- 词单 ----------
-
   String get _listId => SettingsStore.wordList.value;
 
-  int? get _level => switch (_listId) {
-        'beginner' => 0,
+  int get _level => switch (_listId) {
         'intermediate' => 1,
         'advanced' => 2,
-        _ => null,
+        _ => 0,
       };
 
-  bool get _dictMode => _listId != 'user';
+  String get _listName => SettingsStore.listOptions[_listId] ?? '初级';
 
-  /// 词对来源：全部词对 = 自建；分级页只看官方词条。
-  List<WordPair> get _pairSource => _userPairs.pairs;
-
-  List<DictEntry> get _dictList => _dictMode
-      ? Dictionary.page(level: _level, offset: 0, limit: _limit)
-      : const [];
-
-  int get _dictTotal => _dictMode ? Dictionary.countOf(level: _level) : 0;
-
-  void refresh() {
-    if (mounted) setState(() {});
-  }
-
-  List<WordPair> get _visiblePairs {
-    final base = _pairSource;
-    if (_query.isEmpty) return base;
-    final q = _query.toLowerCase();
-    return base.where((pair) {
-      return pair.first.form.toLowerCase().contains(q) ||
-          pair.second.form.toLowerCase().contains(q) ||
-          pair.summary.toLowerCase().contains(q) ||
-          pair.tag.toLowerCase().contains(q);
-    }).toList();
-  }
-
-  // ---------- 单词（官方词单） ----------
-
-  List<DictEntry>? _levelCache;
-  String? _levelCacheKey;
-
-  List<DictEntry> _levelWords() {
-    if (!_dictMode) return const [];
-    if (_levelCache != null && _levelCacheKey == _listId) {
-      return _levelCache!;
-    }
+  List<DictEntry> get _levelWords {
+    if (_levelCache != null && _levelCacheKey == _listId) return _levelCache!;
     _levelCache = Dictionary.allOf(level: _level);
     _levelCacheKey = _listId;
     return _levelCache!;
@@ -134,9 +103,24 @@ class HomeScreenState extends State<HomeScreen> {
 
   String _wid(String word) => 'w:$word';
 
+  int get _learnedCount =>
+      _cLearned ??= _levelWords
+          .where((e) => _progress.statFor(_wid(e.word)).learned)
+          .length;
+
+  int get _masteredCount =>
+      _cMastered ??= _levelWords
+          .where((e) => _progress.isMastered(_wid(e.word)))
+          .length;
+
+  int get _dueCount =>
+      _cDue ??= _levelWords
+          .where((e) => _progress.statFor(_wid(e.word)).isDue)
+          .length;
+
   List<DictEntry> _unlearnedWords(int count) {
     final out = <DictEntry>[];
-    for (final entry in _levelWords()) {
+    for (final entry in _levelWords) {
       if (_progress.statFor(_wid(entry.word)).learned) continue;
       out.add(entry);
       if (out.length >= count) break;
@@ -144,76 +128,48 @@ class HomeScreenState extends State<HomeScreen> {
     return out;
   }
 
-  List<DictEntry> _dueWords() {
+  List<DictEntry> _dueWords(int count) {
     final out = <DictEntry>[];
-    for (final entry in _levelWords()) {
+    for (final entry in _levelWords) {
       if (_progress.statFor(_wid(entry.word)).isDue) out.add(entry);
+      if (out.length >= count) break;
     }
     return out;
   }
 
-  int _learnedWords() => _levelWords()
-      .where((e) => _progress.statFor(_wid(e.word)).learned)
-      .length;
-
-  int _masteredWords() => _levelWords()
-      .where((e) => _progress.isMastered(_wid(e.word)))
-      .length;
-
-  Future<void> _runWordQuiz(String title, List<DictEntry> words) async {
+  Future<void> _runQuiz(List<DictEntry> words) async {
+    if (words.isEmpty) return;
     await Navigator.of(context).push(
       fadeUpRoute(
         WordQuizScreen(
-          title: title,
+          title: _listName,
           words: words,
-          pool: _levelWords(),
+          pool: _levelWords,
           store: _progress,
         ),
       ),
     );
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(_recount);
   }
 
-  // ---------- 动作 ----------
-
-  Future<void> _startReview() async {
-    if (_dictMode) {
-      final due = _dueWords();
-      if (due.isEmpty) {
-        _toast('这一册还没有到期的单词');
-        return;
-      }
-      final batch = due.take(SettingsStore.learnBatch.value).toList();
-      await _runWordQuiz(_listName, batch);
+  void _startReview() {
+    final due = _dueWords(SettingsStore.learnBatch.value);
+    if (due.isEmpty) {
+      _toast('这一册还没有到期的单词');
       return;
     }
-
-    final queue = _progress.dueQueue(_pairSource);
-    if (queue.isEmpty) {
-      _toast('这一单还没有到期的词对');
-      return;
-    }
-    await Navigator.of(context).push(
-      fadeUpRoute(QuizScreen(pairs: queue, store: _progress)),
-    );
-    if (mounted) setState(() {});
+    _runQuiz(due);
   }
 
   void _startLearn() {
-    if (!_dictMode) {
-      setState(() => _showPairs = true);
-      return;
-    }
     final words = _unlearnedWords(SettingsStore.learnBatch.value);
     if (words.isEmpty) {
       _toast('这一册都学完了');
       return;
     }
-    _runWordQuiz(_listName, words);
+    _runQuiz(words);
   }
-
-  String get _listName =>
-      SettingsStore.listOptions[_listId] ?? '初级';
 
   void _toast(String message) {
     ScaffoldMessenger.of(context)
@@ -251,7 +207,7 @@ class HomeScreenState extends State<HomeScreen> {
                     entry.value,
                     style: TextStyle(fontSize: 14.5, color: bp.ink),
                   ),
-                  trailing: SettingsStore.wordList.value == entry.key
+                  trailing: _listId == entry.key
                       ? Icon(Icons.check_rounded, size: 18, color: bp.primary)
                       : null,
                   onTap: () => Navigator.of(context).pop(entry.key),
@@ -266,81 +222,34 @@ class HomeScreenState extends State<HomeScreen> {
     await SettingsStore().setWordList(picked);
     if (!mounted) return;
     setState(() {
-      _showPairs = false;
+      _levelCache = null;
       _limit = 50;
+      _recount();
     });
-  }
-
-  Future<void> _openDetail(WordPair pair) async {
-    await Navigator.of(context).push(
-      fadeUpRoute(
-        DetailScreen(pair: pair, store: _progress, userPairs: _userPairs),
-      ),
-    );
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _openLearnedList() async {
-    await Navigator.of(context).push(
-      fadeUpRoute(
-        LearnedListScreen(
-          pairs: _pairSource,
-          store: _progress,
-          userPairs: _userPairs,
-        ),
-      ),
-    );
-    if (mounted) setState(() {});
   }
 
   Future<void> _openLearnSettings() async {
     await Navigator.of(context).push(fadeUpRoute(const LearnSettingsScreen()));
-    if (mounted) setState(() {});
+    if (mounted) setState(_recount);
   }
 
-  Future<void> _deletePair(WordPair pair) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        final p = context.pal;
-        return AlertDialog(
-          title: const Text('删除这组词对？'),
-          content: Text('${pair.first.form} / ${pair.second.form} 会被删掉，不能恢复。'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('算了'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text('删除', style: TextStyle(color: p.danger)),
-            ),
-          ],
-        );
-      },
-    );
-    if (confirmed != true) return;
-    await _userPairs.remove(pair.id);
-    await _progress.forget(pair.id);
-    if (mounted) setState(() {});
+  void _openFamily(String word) {
+    final family = familyForWord(word);
+    if (family == null) {
+      _toast('「$word」还没有词族');
+      return;
+    }
+    Navigator.of(context).push(fadeUpRoute(FamilyScreen(family: family)));
   }
 
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
-    final visible = _visiblePairs;
-    final learned = _dictMode
-        ? _learnedWords()
-        : _progress.learnedPairs(_pairSource).length;
-    final mastered = _dictMode
-        ? _masteredWords()
-        : _progress.masteredPairs(_pairSource).length;
-    final due = _dictMode ? _dueWords().length : _progress.dueCount(_pairSource);
-    final toLearn =
-        _dictMode ? (_dictTotal - learned) : _progress.unlearned(_pairSource).length;
-    final total = _dictMode ? _dictTotal : _pairSource.length;
-    final dictItems =
-        _showPairs && _query.isEmpty ? _dictList : const <DictEntry>[];
+    final learned = _learnedCount;
+    final mastered = _masteredCount;
+    final due = _dueCount;
+    final total = _levelWords.length;
+    final words = _levelWords.take(_limit).toList();
 
     return Scaffold(
       body: SafeArea(
@@ -368,7 +277,7 @@ class HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 6),
             Text(
-              '先看对比学一组，练过才进复习。',
+              '一个词一个词地记，右边的小图标能看它的词根关系。',
               style: TextStyle(fontSize: 13.5, height: 1.6, color: p.muted),
             ),
             const SizedBox(height: 18),
@@ -382,21 +291,17 @@ class HomeScreenState extends State<HomeScreen> {
                     learned: learned,
                     mastered: mastered,
                     total: total,
-                    unit: _dictMode ? '词' : '组',
-                    unlearned: toLearn,
-                    listName: SettingsStore.listOptions[_listId] ?? '全部词对',
+                    unlearned: total - learned,
+                    listName: _listName,
                     onReview: _startReview,
                     onLearn: _startLearn,
                     onSettings: _openLearnSettings,
-                    onLearned: _openLearnedList,
                     onPickList: _pickWordList,
                   ),
                   _ProgressCard(
                     mastered: mastered,
-                    fresh: toLearn,
-                    own: _userPairs.pairs.length,
+                    fresh: total - learned,
                     accuracy: _progress.overallAccuracy,
-                    onTap: _openLearnedList,
                   ),
                 ],
               ),
@@ -421,12 +326,12 @@ class HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 18),
             _SearchBox(controller: _search, onChanged: _onSearch),
-            if (_query.isNotEmpty && _dictResults.isNotEmpty) ...[
+            if (_query.isNotEmpty) ...[
               const SizedBox(height: 18),
               Row(
                 children: [
                   Text(
-                    '词典',
+                    '搜索结果',
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
@@ -435,76 +340,64 @@ class HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '${_dictResults.length} 条',
+                    '${_searchResults.length} 条',
                     style: TextStyle(fontSize: 13, color: p.muted),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              for (final entry in _dictResults)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _DictTile(
-                    entry: entry,
-                    onTap: () => showDictEntrySheet(context, entry),
-                  ),
-                ),
-            ],
-            if (_showPairs) ...[
-              const SizedBox(height: 22),
-              Row(
-                children: [
-                  Text(
-                    _dictMode ? '词条' : '词对',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: p.ink,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _dictMode
-                        ? '${dictItems.length} / $_dictTotal'
-                        : '${visible.length} 组',
-                    style: TextStyle(fontSize: 13, color: p.muted),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              if (!_dictMode && visible.isEmpty)
+              const SizedBox(height: 10),
+              if (_searchResults.isEmpty)
                 Container(
-                  padding: const EdgeInsets.symmetric(vertical: 34),
+                  padding: const EdgeInsets.symmetric(vertical: 28),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: p.card,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: Text(
-                    '自建词库还是空的',
+                    '没找到「${_query.trim()}」',
                     style: TextStyle(fontSize: 13, color: p.hint),
                   ),
                 ),
-              for (final pair in visible)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _PairCard(
-                    pair: pair,
-                    stat: _progress.statFor(pair.id),
-                    onTap: () => _openDetail(pair),
-                    onLongPress:
-                        pair.isUserMade ? () => _deletePair(pair) : null,
-                  ),
-                ),
-              for (final entry in dictItems)
+              for (final entry in _searchResults)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: _DictTile(
+                  child: _WordTile(
                     entry: entry,
                     onTap: () => showDictEntrySheet(context, entry),
+                    onFamily: () => _openFamily(entry.word),
                   ),
                 ),
-              if (_dictMode && dictItems.length < _dictTotal)
+            ] else ...[
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Text(
+                    '词条',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: p.ink,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${words.length} / $total',
+                    style: TextStyle(fontSize: 13, color: p.muted),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              for (final entry in words)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _WordTile(
+                    entry: entry,
+                    onTap: () => showDictEntrySheet(context, entry),
+                    onFamily: () => _openFamily(entry.word),
+                  ),
+                ),
+              if (words.length < total)
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Center(
@@ -525,19 +418,16 @@ class HomeScreenState extends State<HomeScreen> {
   }
 }
 
-/// 主卡：参考词书 App 的布局——封面、书名、预计天数、进度条、复习/新学。
 class _SummaryCard extends StatelessWidget {
   final int due;
   final int learned;
   final int mastered;
   final int total;
-  final String unit;
   final int unlearned;
   final String listName;
   final VoidCallback onReview;
   final VoidCallback onLearn;
   final VoidCallback onSettings;
-  final VoidCallback onLearned;
   final VoidCallback onPickList;
 
   const _SummaryCard({
@@ -545,13 +435,11 @@ class _SummaryCard extends StatelessWidget {
     required this.learned,
     required this.mastered,
     required this.total,
-    required this.unit,
     required this.unlearned,
     required this.listName,
     required this.onReview,
     required this.onLearn,
     required this.onSettings,
-    required this.onLearned,
     required this.onPickList,
   });
 
@@ -579,7 +467,7 @@ class _SummaryCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _Cover(),
+              const _Cover(),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -597,49 +485,42 @@ class _SummaryCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '共 $total $unit',
+                      '共 $total 词',
                       style: TextStyle(fontSize: 12.5, color: p.muted),
                     ),
                     const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        InkWell(
-                          onTap: onPickList,
-                          borderRadius: BorderRadius.circular(8),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  '选择词单',
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    color: p.hint,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  listName,
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: p.primary,
-                                  ),
-                                ),
-                                Icon(
-                                  Icons.chevron_right_rounded,
-                                  size: 14,
-                                  color: p.hint,
-                                ),
-                              ],
-                            ),
-                          ),
+                    InkWell(
+                      onTap: onPickList,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
                         ),
-                      ],
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '选择词单',
+                              style: TextStyle(fontSize: 11.5, color: p.hint),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              listName,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: p.primary,
+                              ),
+                            ),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              size: 14,
+                              color: p.hint,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Container(
@@ -696,33 +577,9 @@ class _SummaryCard extends StatelessWidget {
               _DotStat(count: mastered, label: '掌握', color: accent),
               const SizedBox(width: 16),
               _DotStat(count: learned, label: '已学', color: p.hint),
-              const Spacer(),
-              InkWell(
-                onTap: onLearned,
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 2,
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        '学习列表',
-                        style: TextStyle(fontSize: 12.5, color: p.muted),
-                      ),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        size: 16,
-                        color: p.muted,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -780,8 +637,9 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-/// 小书封：深梅底 + 白色 M。
 class _Cover extends StatelessWidget {
+  const _Cover();
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -884,74 +742,59 @@ class _DotStat extends StatelessWidget {
 class _ProgressCard extends StatelessWidget {
   final int mastered;
   final int fresh;
-  final int own;
   final int accuracy;
-  final VoidCallback onTap;
 
   const _ProgressCard({
     required this.mastered,
     required this.fresh,
-    required this.own,
     required this.accuracy,
-    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
 
-    return Material(
-      color: p.card,
-      borderRadius: BorderRadius.circular(24),
-      child: InkWell(
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      decoration: BoxDecoration(
+        color: p.card,
         borderRadius: BorderRadius.circular(24),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              const Spacer(),
-              Row(
-                children: [
-                  _BigStat(
-                    icon: Icons.workspace_premium_rounded,
-                    value: '$mastered',
-                    color: p.success,
-                  ),
-                  const SizedBox(width: 26),
-                  _BigStat(
-                    icon: Icons.fiber_new_rounded,
-                    value: '$fresh',
-                    color: p.primary,
-                  ),
-                  const SizedBox(width: 26),
-                  _BigStat(
-                    icon: Icons.edit_note_rounded,
-                    value: '$own',
-                    color: p.muted,
-                  ),
-                ],
+              _BigStat(
+                icon: Icons.workspace_premium_rounded,
+                value: '$mastered',
+                color: p.success,
               ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Icon(
-                    Icons.check_circle_outline_rounded,
-                    size: 16,
-                    color: p.hint,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    '正确率 $accuracy%',
-                    style: TextStyle(fontSize: 12.5, color: p.muted),
-                  ),
-                ],
+              const SizedBox(width: 26),
+              _BigStat(
+                icon: Icons.fiber_new_rounded,
+                value: '$fresh',
+                color: p.primary,
               ),
-              const Spacer(),
             ],
           ),
-        ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Icon(
+                Icons.check_circle_outline_rounded,
+                size: 16,
+                color: p.hint,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '正确率 $accuracy%',
+                style: TextStyle(fontSize: 12.5, color: p.muted),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -971,7 +814,6 @@ class _BigStat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Icon(icon, size: 22, color: color),
         const SizedBox(width: 7),
@@ -1018,11 +860,17 @@ class _SearchBox extends StatelessWidget {
   }
 }
 
-class _DictTile extends StatelessWidget {
+/// 单词条：左边级别、中间词和释义、右边词族按钮。
+class _WordTile extends StatelessWidget {
   final DictEntry entry;
   final VoidCallback onTap;
+  final VoidCallback onFamily;
 
-  const _DictTile({required this.entry, required this.onTap});
+  const _WordTile({
+    required this.entry,
+    required this.onTap,
+    required this.onFamily,
+  });
 
   Color _levelColor(Palette p) => switch (entry.level) {
         0 => p.success,
@@ -1040,6 +888,7 @@ class _DictTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.pal;
     final levelColor = _levelColor(p);
+    final hasFamily = familyForWord(entry.word) != null;
 
     return Material(
       color: p.card,
@@ -1048,87 +897,7 @@ class _DictTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 18,
-                    height: 18,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: levelColor.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                    child: Text(
-                      _levelName,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: levelColor,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      entry.word,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: p.ink,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    'p${entry.page}',
-                    style: TextStyle(fontSize: 10.5, color: p.hint),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 5),
-              Text(
-                entry.gloss.isEmpty ? '—' : entry.gloss,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12.5, height: 1.6, color: p.muted),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PairCard extends StatelessWidget {
-  final WordPair pair;
-  final PairStat stat;
-  final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-
-  const _PairCard({
-    required this.pair,
-    required this.stat,
-    required this.onTap,
-    this.onLongPress,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.pal;
-
-    return Material(
-      color: p.card,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        onLongPress: onLongPress,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
+          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
           child: Row(
             children: [
               Expanded(
@@ -1137,83 +906,87 @@ class _PairCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Flexible(child: _word(pair.first.form, p)),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: Icon(
-                            Icons.compare_arrows_rounded,
-                            size: 16,
-                            color: p.primary.withValues(alpha: 0.7),
-                          ),
-                        ),
-                        Flexible(child: _word(pair.second.form, p)),
-                      ],
-                    ),
-                    const SizedBox(height: 7),
-                    Text(
-                      pair.summary,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        height: 1.5,
-                        color: p.muted,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 9,
-                            vertical: 4,
-                          ),
+                          width: 18,
+                          height: 18,
+                          alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            color: p.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(7),
+                            color: levelColor.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(5),
                           ),
                           child: Text(
-                            pair.tag,
+                            _levelName,
                             style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: p.primary,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: levelColor,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Text(
-                          stat.untrained
-                              ? '还没练过'
-                              : '练 ${stat.seen} 次 · ${stat.accuracyPercent}%',
-                          style: TextStyle(fontSize: 11, color: p.hint),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            entry.word,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: p.ink,
+                            ),
+                          ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 5),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 26),
+                      child: Text(
+                        entry.gloss.isEmpty ? '—' : entry.gloss,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12.5, color: p.muted),
+                      ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 6),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 22,
-                color: p.hint.withValues(alpha: 0.6),
-              ),
+              _FamilyButton(onTap: onFamily, active: hasFamily),
             ],
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _word(String text, Palette p) => Text(
-        text,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w700,
-          color: p.ink,
+class _FamilyButton extends StatelessWidget {
+  final VoidCallback onTap;
+  final bool active;
+
+  const _FamilyButton({required this.onTap, this.active = true});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+
+    return Tooltip(
+      message: '词根关系网',
+      child: Material(
+        color: p.primary.withValues(alpha: active ? 0.12 : 0.05),
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+            child: Icon(
+              Icons.hub_outlined,
+              size: 17,
+              color: active ? p.primary : p.hint,
+            ),
+          ),
         ),
-      );
+      ),
+    );
+  }
 }
