@@ -384,7 +384,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 10),
                 _InfoRow(label: '已掌握', value: '${widget.progress.trainedPairs} 组'),
                 const SizedBox(height: 10),
-                _InfoRow(label: '版本', value: '2.6.0'),
+                _InfoRow(label: '版本', value: '2.8.0'),
               ],
             ),
           ),
