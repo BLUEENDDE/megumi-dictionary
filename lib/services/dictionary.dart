@@ -66,6 +66,13 @@ class Dictionary {
     return [...prefix, ...contains].take(limit).toList();
   }
 
+  static Map<String, DictEntry>? _byWord;
+
+  static DictEntry? entryOf(String word) {
+    _byWord ??= {for (final e in _entries) e.word: e};
+    return _byWord![word];
+  }
+
   static List<DictEntry> allOf({int? level}) => level == null
       ? _entries
       : _entries.where((e) => e.level == level).toList();
