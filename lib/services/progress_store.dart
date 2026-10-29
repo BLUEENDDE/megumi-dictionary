@@ -25,12 +25,16 @@ class PairStat {
 
   bool get untrained => seen == 0;
 
+  /// 学过至少一次。没学过的词不进复习队列。
+  bool get learned => seen > 0;
+
   double get accuracy => seen == 0 ? 0 : right / seen;
 
   int get accuracyPercent => (accuracy * 100).round();
 
+  /// 已学过、且到了该复习的时间。没学过的永远不算"到期"。
   bool get isDue {
-    if (dueAt == null) return true;
+    if (seen == 0 || dueAt == null) return false;
     return DateTime.now().millisecondsSinceEpoch >= dueAt!;
   }
 
@@ -118,36 +122,21 @@ class ProgressStore {
     return seen == 0 ? 0 : (right / seen * 100).round();
   }
 
-  /// 到期待复习的组数。
+  /// 到期待复习的组数（只算学过的）。
   int dueCount(List<WordPair> pairs) =>
       pairs.where((p) => statFor(p.id).isDue).length;
 
-  /// 复习顺序：先到期的（早的在前），再到期的旧词，最后是还没到期的。
-  List<WordPair> orderForReview(List<WordPair> pairs) {
-    final due = <WordPair>[];
-    final waiting = <WordPair>[];
+  /// 还没学过的词对，按原顺序。
+  List<WordPair> unlearned(List<WordPair> pairs) =>
+      pairs.where((p) => !statFor(p.id).learned).toList();
 
-    for (final pair in pairs) {
-      if (statFor(pair.id).isDue) {
-        due.add(pair);
-      } else {
-        waiting.add(pair);
-      }
-    }
-
-    int byDue(WordPair a, WordPair b) {
-      final da = statFor(a.id).dueAt ?? 0;
-      final db = statFor(b.id).dueAt ?? 0;
-      if (da == 0 && db == 0) return 0;
-      // 没练过的（dueAt=null）排在已到期之后
-      if (da == 0) return 1;
-      if (db == 0) return -1;
-      return da.compareTo(db);
-    }
-
-    due.sort(byDue);
-    waiting.sort(byDue);
-    return [...due, ...waiting];
+  /// 复习队列：只包含学过的、且到期的词对，最早到期的排前面。
+  List<WordPair> dueQueue(List<WordPair> pairs) {
+    final due = pairs.where((p) => statFor(p.id).isDue).toList();
+    due.sort((a, b) => (statFor(a.id).dueAt ?? 0).compareTo(
+          statFor(b.id).dueAt ?? 0,
+        ));
+    return due;
   }
 
   Future<void> record(String pairId, bool isRight) async {

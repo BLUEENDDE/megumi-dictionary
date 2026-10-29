@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../models/word_pair.dart';
 import '../services/progress_store.dart';
@@ -56,11 +56,28 @@ class _HomeScreenState extends State<HomeScreen> {
     }).toList();
   }
 
-  Future<void> _openQuiz() async {
-    final queue = _progress.orderForReview(_allPairs);
+  /// 复习：只复习学过且到期的。
+  Future<void> _startReview() async {
+    final queue = _progress.dueQueue(_allPairs);
     if (queue.isEmpty) return;
     await Navigator.of(context).push(
       fadeUpRoute(QuizScreen(pairs: queue, store: _progress)),
+    );
+    if (mounted) setState(() {});
+  }
+
+  /// 学新词：打开第一组还没学过的对比卡，练过一次才算学过。
+  Future<void> _learnNext() async {
+    final queue = _progress.unlearned(_allPairs);
+    if (queue.isEmpty) return;
+    await _openDetail(queue.first);
+  }
+
+  Future<void> _openDetail(WordPair pair) async {
+    await Navigator.of(context).push(
+      fadeUpRoute(
+        DetailScreen(pair: pair, store: _progress, userPairs: _userPairs),
+      ),
     );
     if (mounted) setState(() {});
   }
@@ -105,7 +122,20 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final p = context.pal;
     final visible = _visiblePairs;
-    final due = _progress.isLoaded ? _progress.dueCount(_allPairs) : 0;
+    final loaded = _progress.isLoaded;
+    final due = loaded ? _progress.dueCount(_allPairs) : 0;
+    final toLearn = loaded ? _progress.unlearned(_allPairs).length : 0;
+
+    final bannerTitle = due > 0
+        ? '开始复习'
+        : toLearn > 0
+            ? '学新词对'
+            : '今天练完了';
+    final bannerTap = due > 0
+        ? _startReview
+        : toLearn > 0
+            ? _learnNext
+            : null;
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
@@ -130,7 +160,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'INDONESIAN · 辨析',
+                        'INDONESIAN · 背词',
                         style: TextStyle(
                           fontSize: 11,
                           letterSpacing: 1.6,
@@ -140,7 +170,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        '易混词',
+                        '背词',
                         style: TextStyle(
                           fontSize: 34,
                           height: 1.1,
@@ -171,18 +201,18 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 6),
             Text(
-              '一次只比两个词，比一遍遍背释义有用。',
+              '先看对比学一组，练过才进复习。',
               style: TextStyle(fontSize: 14, height: 1.6, color: p.muted),
             ),
             const SizedBox(height: 22),
             _ReviewBanner(
-              title: due > 0 ? '开始复习' : '随便练练',
-              subtitle: _bannerSubtitle(due),
+              title: bannerTitle,
+              subtitle: _bannerSubtitle(due, toLearn),
               color: p.primary,
               foreground: context.isDark
                   ? const Color(0xFF10231F)
                   : Colors.white,
-              onTap: _openQuiz,
+              onTap: bannerTap,
             ),
             const SizedBox(height: 12),
             _StatsRow(store: _progress, userCount: _userPairs.pairs.length),
@@ -231,18 +261,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: _PairCard(
                   pair: pair,
                   stat: _progress.statFor(pair.id),
-                  onTap: () async {
-                    await Navigator.of(context).push(
-                      fadeUpRoute(
-                        DetailScreen(
-                          pair: pair,
-                          store: _progress,
-                          userPairs: _userPairs,
-                        ),
-                      ),
-                    );
-                    if (mounted) setState(() {});
-                  },
+                  onTap: () => _openDetail(pair),
                   onLongPress: pair.isUserMade ? () => _deletePair(pair) : null,
                 ),
               ),
@@ -252,13 +271,16 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String _bannerSubtitle(int due) {
+  String _bannerSubtitle(int due, int toLearn) {
     if (!_progress.isLoaded) return '${_allPairs.length} 组词对';
     if (due > 0) return '$due 组到期 · 按记忆曲线安排';
+    if (toLearn > 0) {
+      return '还有 $toLearn 组没学过 · 先看对比，练一次算学会';
+    }
     if (_progress.todayCount > 0) {
       return '今天已练 ${_progress.todayCount} 题 · 明天再来';
     }
-    return '${_allPairs.length} 组词对 · 约两分钟';
+    return '全部学过了，明天再见';
   }
 }
 
@@ -352,7 +374,7 @@ class _ReviewBanner extends StatelessWidget {
   final String subtitle;
   final Color color;
   final Color foreground;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _ReviewBanner({
     required this.title,
@@ -364,8 +386,11 @@ class _ReviewBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final disabled = onTap == null;
+    final p = context.pal;
+
     return Material(
-      color: color,
+      color: disabled ? p.chipBg : color,
       borderRadius: BorderRadius.circular(22),
       child: InkWell(
         borderRadius: BorderRadius.circular(22),
@@ -378,12 +403,14 @@ class _ReviewBanner extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: foreground.withValues(alpha: 0.18),
+                  color: disabled
+                      ? p.hint.withValues(alpha: 0.15)
+                      : foreground.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
-                  Icons.play_arrow_rounded,
-                  color: foreground,
+                  disabled ? Icons.check_rounded : Icons.play_arrow_rounded,
+                  color: disabled ? p.hint : foreground,
                   size: 26,
                 ),
               ),
@@ -397,7 +424,7 @@ class _ReviewBanner extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w700,
-                        color: foreground,
+                        color: disabled ? p.muted : foreground,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -405,17 +432,20 @@ class _ReviewBanner extends StatelessWidget {
                       subtitle,
                       style: TextStyle(
                         fontSize: 12.5,
-                        color: foreground.withValues(alpha: 0.85),
+                        color: disabled
+                            ? p.hint
+                            : foreground.withValues(alpha: 0.85),
                       ),
                     ),
                   ],
                 ),
               ),
-              Icon(
-                Icons.arrow_forward_rounded,
-                color: foreground.withValues(alpha: 0.9),
-                size: 20,
-              ),
+              if (!disabled)
+                Icon(
+                  Icons.arrow_forward_rounded,
+                  color: foreground.withValues(alpha: 0.9),
+                  size: 20,
+                ),
             ],
           ),
         ),

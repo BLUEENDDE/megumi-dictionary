@@ -53,7 +53,23 @@ void main() {
     expect(stat.dueAt! > DateTime.now().millisecondsSinceEpoch, isTrue);
   });
 
-  test('复习顺序：到期的排前面', () async {
+  test('没学过的词不进复习队列', () async {
+    final store = ProgressStore();
+    await store.load();
+
+    final fresh = _pair('fresh');
+    final learned = _pair('learned');
+
+    await store.record('learned', true); // 学过，明天才到期
+
+    expect(store.statFor('fresh').learned, isFalse);
+    expect(store.statFor('fresh').isDue, isFalse, reason: '没学过不该算到期');
+    expect(store.dueQueue([fresh, learned]), isEmpty);
+    expect(store.unlearned([fresh, learned]).map((p) => p.id), ['fresh']);
+    expect(store.dueCount([fresh, learned]), 0);
+  });
+
+  test('学过的到期后才进复习，且早到期的排前面', () async {
     final store = ProgressStore();
     await store.load();
 
@@ -61,9 +77,9 @@ void main() {
     final due = _pair('due');
     final later = _pair('later');
 
-    await store.record('due', true); // box1 -> 明天
+    await store.record('due', true);
     await store.record('later', true);
-    await store.record('later', true); // box2 -> 2 天后
+    await store.record('later', true);
 
     // 把 due 的到期时间手动拉到过去，模拟到期
     final data = store.toJson();
@@ -72,10 +88,10 @@ void main() {
         DateTime.now().subtract(const Duration(days: 1)).millisecondsSinceEpoch;
     store.loadFromMap(data);
 
-    final ordered = store.orderForReview([later, fresh, due]);
-    expect(ordered.first.id, 'due');
-    expect(ordered.last.id, 'later');
-    expect(store.dueCount([fresh, due, later]), 2); // fresh + due
+    final queue = store.dueQueue([later, fresh, due]);
+    expect(queue.map((p) => p.id), ['due'], reason: '只有到期且学过的进队列');
+    expect(store.dueCount([fresh, due, later]), 1);
+    expect(store.unlearned([fresh, due, later]).map((p) => p.id), ['fresh']);
   });
 
   test('盒子不会超过上限', () async {

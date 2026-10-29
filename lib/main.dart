@@ -20,7 +20,7 @@ class VocabApp extends StatelessWidget {
       valueListenable: SettingsStore.themeMode,
       builder: (context, mode, _) {
         return MaterialApp(
-          title: '印尼语易混词',
+          title: '印尼语背词',
           debugShowCheckedModeBanner: false,
           theme: buildTheme(Palette.light, Brightness.light),
           darkTheme: buildTheme(Palette.dark, Brightness.dark),
