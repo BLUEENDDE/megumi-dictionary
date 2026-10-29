@@ -9,6 +9,8 @@ import 'screens/add_pair_screen.dart';
 import 'screens/detail_screen.dart';
 import 'screens/family_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/learn_session_screen.dart';
+import 'screens/learned_list_screen.dart';
 import 'screens/quiz_screen.dart';
 import 'screens/settings_screen.dart';
 import 'services/progress_store.dart';
@@ -43,6 +45,15 @@ class PreviewApp extends StatelessWidget {
       'quiz-wrong' => QuizScreen(pairs: samplePairs, previewAnswer: 'wrong'),
       'add' => const AddPairScreen(),
       'family' => FamilyScreen(family: wordFamilies.first),
+      'learned' => LearnedListScreen(
+          pairs: samplePairs,
+          store: progress,
+          userPairs: userPairs,
+        ),
+      'learn' => LearnSessionScreen(
+          pairs: samplePairs.take(3).toList(),
+          store: progress,
+        ),
       'settings' => SettingsScreen(progress: progress, userPairs: userPairs),
       _ => const HomeScreen(pairs: samplePairs),
     };

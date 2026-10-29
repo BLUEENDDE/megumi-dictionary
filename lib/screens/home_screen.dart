@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../models/word_pair.dart';
 import '../services/progress_store.dart';
+import '../services/settings_store.dart';
 import '../services/user_pairs_store.dart';
 import '../theme/palette.dart';
 import '../widgets/ui_kit.dart';
 import 'add_pair_screen.dart';
 import 'detail_screen.dart';
+import 'learn_session_screen.dart';
+import 'learned_list_screen.dart';
 import 'quiz_screen.dart';
 import 'settings_screen.dart';
 
@@ -66,11 +69,34 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) setState(() {});
   }
 
-  /// 学新词：打开第一组还没学过的对比卡，练过一次才算学过。
+  /// 学新词：按当前批量取一组，进学习会话。
   Future<void> _learnNext() async {
     final queue = _progress.unlearned(_allPairs);
     if (queue.isEmpty) return;
-    await _openDetail(queue.first);
+    final batch = queue.take(SettingsStore.learnBatch.value).toList();
+    final learned = await Navigator.of(context).push<int>(
+      fadeUpRoute(LearnSessionScreen(pairs: batch, store: _progress)),
+    );
+    if (!mounted) return;
+    setState(() {});
+    if (learned != null && learned > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('这一轮学会了 $learned 组')),
+      );
+    }
+  }
+
+  Future<void> _openLearnedList() async {
+    await Navigator.of(context).push(
+      fadeUpRoute(
+        LearnedListScreen(
+          pairs: _allPairs,
+          store: _progress,
+          userPairs: _userPairs,
+        ),
+      ),
+    );
+    if (mounted) setState(() {});
   }
 
   Future<void> _openDetail(WordPair pair) async {
@@ -125,12 +151,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final loaded = _progress.isLoaded;
     final due = loaded ? _progress.dueCount(_allPairs) : 0;
     final toLearn = loaded ? _progress.unlearned(_allPairs).length : 0;
+    final learned = loaded ? _progress.learnedPairs(_allPairs).length : 0;
+    final mastered = loaded ? _progress.masteredPairs(_allPairs).length : 0;
 
-    final bannerTitle = due > 0
-        ? '开始复习'
-        : toLearn > 0
-            ? '学新词对'
-            : '今天练完了';
+    // 按钮统一叫"开始复习"：有到期的就复习，没到期的就先学新的。
+    final bannerTitle = (due > 0 || toLearn > 0) ? '开始复习' : '今天练完了';
     final bannerTap = due > 0
         ? _startReview
         : toLearn > 0
@@ -204,7 +229,9 @@ class _HomeScreenState extends State<HomeScreen> {
               '先看对比学一组，练过才进复习。',
               style: TextStyle(fontSize: 14, height: 1.6, color: p.muted),
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 20),
+            const _BatchSelector(),
+            const SizedBox(height: 12),
             _ReviewBanner(
               title: bannerTitle,
               subtitle: _bannerSubtitle(due, toLearn),
@@ -216,6 +243,12 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 12),
             _StatsRow(store: _progress, userCount: _userPairs.pairs.length),
+            const SizedBox(height: 10),
+            _LearnedEntry(
+              learned: learned,
+              mastered: mastered,
+              onTap: _openLearnedList,
+            ),
             if (_allPairs.length > 4) ...[
               const SizedBox(height: 18),
               _SearchBox(
@@ -365,6 +398,134 @@ class _Stat extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _BatchSelector extends StatelessWidget {
+  const _BatchSelector();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+
+    return ValueListenableBuilder<int>(
+      valueListenable: SettingsStore.learnBatch,
+      builder: (context, batch, _) {
+        return Row(
+          children: [
+            Text(
+              '一次记',
+              style: TextStyle(fontSize: 12.5, color: p.muted),
+            ),
+            const SizedBox(width: 10),
+            for (final n in SettingsStore.batchOptions)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: _BatchChip(
+                  label: '$n',
+                  selected: n == batch,
+                  onTap: () => SettingsStore().setLearnBatch(n),
+                ),
+              ),
+            const Spacer(),
+            Text('个词对', style: TextStyle(fontSize: 12, color: p.hint)),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _BatchChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _BatchChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+
+    return Material(
+      color: selected ? p.primary : p.card,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: selected
+                  ? (context.isDark ? const Color(0xFF10231F) : Colors.white)
+                  : p.muted,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LearnedEntry extends StatelessWidget {
+  final int learned;
+  final int mastered;
+  final VoidCallback onTap;
+
+  const _LearnedEntry({
+    required this.learned,
+    required this.mastered,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+
+    return Material(
+      color: p.card,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Icon(Icons.workspace_premium_outlined, size: 18, color: p.muted),
+              const SizedBox(width: 10),
+              Text(
+                '已学习 $learned 组',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: p.ink,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '· 掌握 $mastered',
+                style: TextStyle(fontSize: 12, color: p.success),
+              ),
+              const Spacer(),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: p.hint.withValues(alpha: 0.7),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

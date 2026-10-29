@@ -102,4 +102,29 @@ void main() {
     }
     expect(store.statFor('p1').box, ProgressStore.maxBox);
   });
+
+  test('走完所有盒子才算掌握', () async {
+    final store = ProgressStore();
+    await store.load();
+
+    final learning = _pair('learning');
+    final mastered = _pair('mastered');
+
+    await store.record('learning', true); // box 1
+    for (var i = 0; i < ProgressStore.maxBox; i++) {
+      await store.record('mastered', true);
+    }
+
+    expect(store.isMastered('learning'), isFalse);
+    expect(store.isMastered('mastered'), isTrue);
+    expect(
+      store.learningPairs([learning, mastered]).map((p) => p.id),
+      ['learning'],
+    );
+    expect(
+      store.masteredPairs([learning, mastered]).map((p) => p.id),
+      ['mastered'],
+    );
+    expect(store.learnedPairs([learning, mastered]).length, 2);
+  });
 }

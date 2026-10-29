@@ -130,6 +130,21 @@ class ProgressStore {
   List<WordPair> unlearned(List<WordPair> pairs) =>
       pairs.where((p) => !statFor(p.id).learned).toList();
 
+  /// 学过的词对（含已掌握）。
+  List<WordPair> learnedPairs(List<WordPair> pairs) =>
+      pairs.where((p) => statFor(p.id).learned).toList();
+
+  /// 复习走完所有盒子 = 掌握。
+  bool isMastered(String pairId) => statFor(pairId).box >= maxBox;
+
+  /// 已掌握的词对。
+  List<WordPair> masteredPairs(List<WordPair> pairs) =>
+      pairs.where((p) => statFor(p.id).learned && isMastered(p.id)).toList();
+
+  /// 学过但还没掌握的（"学习中的"）。
+  List<WordPair> learningPairs(List<WordPair> pairs) =>
+      pairs.where((p) => statFor(p.id).learned && !isMastered(p.id)).toList();
+
   /// 复习队列：只包含学过的、且到期的词对，最早到期的排前面。
   List<WordPair> dueQueue(List<WordPair> pairs) {
     final due = pairs.where((p) => statFor(p.id).isDue).toList();
