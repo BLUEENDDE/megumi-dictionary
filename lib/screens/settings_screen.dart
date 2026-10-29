@@ -58,7 +58,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return AlertDialog(
           title: const Text('导出备份'),
           content: SizedBox(
-            width: 400,
+            width: double.maxFinite,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -98,6 +98,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             TextButton(
               onPressed: () async {
+                var shared = false;
                 try {
                   await SharePlus.instance.share(
                     ShareParams(
@@ -105,12 +106,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       subject: '印尼语背词 备份',
                     ),
                   );
-                  await SettingsStore().markBackedUp();
-                  if (context.mounted) Navigator.of(context).pop();
-                  _toast('已发送，记得把文件存好');
-                } catch (e) {
-                  _toast('分享失败：$e');
+                  shared = true;
+                } catch (_) {
+                  // 分享面板不可用（部分设备/模拟器），退回复制，别让用户白点。
+                  shared = false;
                 }
+                await SettingsStore().markBackedUp();
+                if (!shared) {
+                  await Clipboard.setData(ClipboardData(text: text));
+                }
+                if (context.mounted) Navigator.of(context).pop();
+                if (mounted) setState(() {});
+                _toast(
+                  shared ? '已发送，记得把内容存好' : '分享不可用，已改为复制到剪贴板',
+                );
               },
               child: const Text('发送到…'),
             ),
@@ -140,7 +149,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return AlertDialog(
           title: const Text('导入备份'),
           content: SizedBox(
-            width: 400,
+            width: double.maxFinite,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
