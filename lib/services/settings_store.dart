@@ -17,6 +17,9 @@ class SettingsStore {
   static final ValueNotifier<int> learnBatch =
       ValueNotifier<int>(defaultBatch);
 
+  /// 一组对比词条含两个单词，所以按"词"选、按"组"学。
+  static int pairsForWords(int words) => (words / 2).ceil();
+
   /// 上次导出备份的时间（毫秒），null 表示从未备份过。
   static final ValueNotifier<int?> lastBackupAt = ValueNotifier<int?>(null);
 

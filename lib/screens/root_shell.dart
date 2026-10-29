@@ -1,10 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../models/word_pair.dart';
 import '../services/progress_store.dart';
 import '../services/user_pairs_store.dart';
 import '../theme/palette.dart';
-import 'dictionary_screen.dart';
 import 'home_screen.dart';
 import 'settings_screen.dart';
 
@@ -83,7 +82,6 @@ class _RootShellState extends State<RootShell> {
             progress: _progress,
             userPairs: _userPairs,
           ),
-          const DictionaryScreen(),
           SettingsScreen(
             progress: _progress,
             userPairs: _userPairs,
@@ -104,11 +102,6 @@ class _RootShellState extends State<RootShell> {
             icon: Icon(Icons.menu_book_outlined, color: p.muted),
             selectedIcon: Icon(Icons.menu_book_rounded, color: p.primary),
             label: '背词',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.auto_stories_outlined, color: p.muted),
-            selectedIcon: Icon(Icons.auto_stories_rounded, color: p.primary),
-            label: '词典',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline_rounded, color: p.muted),

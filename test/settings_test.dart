@@ -33,6 +33,13 @@ void main() {
     expect(SettingsStore.batchOptions.contains(SettingsStore.defaultBatch), isTrue);
   });
 
+  test('按词数换算成词对组数（一组两个词）', () {
+    expect(SettingsStore.pairsForWords(5), 3); // 5 个词 → 3 组（6 个词）
+    expect(SettingsStore.pairsForWords(15), 8);
+    expect(SettingsStore.pairsForWords(20), 10);
+    expect(SettingsStore.pairsForWords(2), 1);
+  });
+
   test('备份时间会记住', () async {
     SettingsStore.lastBackupAt.value = null;
     final store = SettingsStore();

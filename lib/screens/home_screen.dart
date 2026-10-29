@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../models/word_pair.dart';
+import '../services/dictionary.dart';
 import '../services/progress_store.dart';
 import '../services/settings_store.dart';
 import '../services/user_pairs_store.dart';
 import '../theme/palette.dart';
+import '../widgets/dict_entry_sheet.dart';
 import '../widgets/ui_kit.dart';
 import 'detail_screen.dart';
 import 'learn_session_screen.dart';
@@ -16,11 +18,15 @@ class HomeScreen extends StatefulWidget {
   final ProgressStore progress;
   final UserPairsStore userPairs;
 
+  /// 预览用：带一个初始查询进来。
+  final String? initialQuery;
+
   const HomeScreen({
     super.key,
     required this.pairs,
     required this.progress,
     required this.userPairs,
+    this.initialQuery,
   });
 
   @override
@@ -31,9 +37,32 @@ class HomeScreenState extends State<HomeScreen> {
   final TextEditingController _search = TextEditingController();
 
   String _query = '';
+  List<DictEntry> _dictResults = const [];
 
   ProgressStore get _progress => widget.progress;
   UserPairsStore get _userPairs => widget.userPairs;
+
+  @override
+  void initState() {
+    super.initState();
+    Dictionary.load().then((_) {
+      if (!mounted) return;
+      final initial = widget.initialQuery;
+      if (initial != null && initial.isNotEmpty) {
+        _search.text = initial;
+        _onSearch(initial);
+      }
+      setState(() {});
+    });
+  }
+
+  void _onSearch(String value) {
+    final q = value.trim();
+    setState(() {
+      _query = q;
+      _dictResults = q.isEmpty ? const [] : Dictionary.search(q, limit: 20);
+    });
+  }
 
   /// 从别的页面回来后刷新（进度可能变了）。
   void refresh() {
@@ -73,7 +102,9 @@ class HomeScreenState extends State<HomeScreen> {
   Future<void> _learnNext() async {
     final queue = _progress.unlearned(_allPairs);
     if (queue.isEmpty) return;
-    final batch = queue.take(SettingsStore.learnBatch.value).toList();
+    final batch = queue
+        .take(SettingsStore.pairsForWords(SettingsStore.learnBatch.value))
+        .toList();
     final learned = await Navigator.of(context).push<int>(
       fadeUpRoute(LearnSessionScreen(pairs: batch, store: _progress)),
     );
@@ -219,8 +250,37 @@ class HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 18),
               _SearchBox(
                 controller: _search,
-                onChanged: (value) => setState(() => _query = value.trim()),
+                onChanged: _onSearch,
               ),
+            ],
+            if (_query.isNotEmpty && _dictResults.isNotEmpty) ...[
+              const SizedBox(height: 22),
+              Row(
+                children: [
+                  Text(
+                    '词典',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: p.ink,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${_dictResults.length} 条',
+                    style: TextStyle(fontSize: 13, color: p.muted),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              for (final entry in _dictResults)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _DictTile(
+                    entry: entry,
+                    onTap: () => showDictEntrySheet(context, entry),
+                  ),
+                ),
             ],
             const SizedBox(height: 24),
             Row(
@@ -395,7 +455,10 @@ class _BatchSelector extends StatelessWidget {
                 ),
               ),
             const Spacer(),
-            Text('个词对', style: TextStyle(fontSize: 12, color: p.hint)),
+            Text(
+              '= ${SettingsStore.pairsForWords(batch)} 组对比',
+              style: TextStyle(fontSize: 11.5, color: p.hint),
+            ),
           ],
         );
       },
@@ -494,6 +557,60 @@ class _LearnedEntry extends StatelessWidget {
                 Icons.chevron_right_rounded,
                 size: 20,
                 color: p.hint.withValues(alpha: 0.7),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DictTile extends StatelessWidget {
+  final DictEntry entry;
+  final VoidCallback onTap;
+
+  const _DictTile({required this.entry, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+
+    return Material(
+      color: p.card,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      entry.word,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: p.ink,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    'p${entry.page}',
+                    style: TextStyle(fontSize: 10.5, color: p.hint),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 5),
+              Text(
+                entry.gloss.isEmpty ? '—' : entry.gloss,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12.5, height: 1.6, color: p.muted),
               ),
             ],
           ),

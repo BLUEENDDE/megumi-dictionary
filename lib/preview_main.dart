@@ -7,7 +7,6 @@ import 'data/sample_data.dart';
 import 'data/word_families.dart';
 import 'screens/add_pair_screen.dart';
 import 'screens/detail_screen.dart';
-import 'screens/dictionary_screen.dart';
 import 'screens/family_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/learn_session_screen.dart';
@@ -59,13 +58,13 @@ class PreviewApp extends StatelessWidget {
         ),
       'settings' => SettingsScreen(progress: progress, userPairs: userPairs),
       'import' => TextImportScreen(userPairs: userPairs),
-      'dict' => DictionaryScreen(initialQuery: params['q']),
       _ => screen == 'shell'
           ? const RootShell(pairs: samplePairs)
           : HomeScreen(
               pairs: samplePairs,
               progress: progress,
               userPairs: userPairs,
+              initialQuery: params['q'],
             ),
     };
 
@@ -88,4 +87,5 @@ class PreviewApp extends StatelessWidget {
     );
   }
 }
+
 
