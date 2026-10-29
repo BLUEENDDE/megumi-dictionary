@@ -9,7 +9,7 @@ import '../theme/palette.dart';
 import '../widgets/dict_entry_sheet.dart';
 import '../widgets/ui_kit.dart';
 import 'detail_screen.dart';
-import 'learn_session_screen.dart';
+import 'learn_settings_screen.dart';
 import 'learned_list_screen.dart';
 import 'quiz_screen.dart';
 
@@ -35,9 +35,13 @@ class HomeScreen extends StatefulWidget {
 
 class HomeScreenState extends State<HomeScreen> {
   final TextEditingController _search = TextEditingController();
+  final PageController _cards = PageController();
 
   String _query = '';
   List<DictEntry> _dictResults = const [];
+
+  /// 点过「新学」之后才展示词对。
+  bool _showPairs = false;
 
   ProgressStore get _progress => widget.progress;
   UserPairsStore get _userPairs => widget.userPairs;
@@ -56,6 +60,13 @@ class HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  @override
+  void dispose() {
+    _search.dispose();
+    _cards.dispose();
+    super.dispose();
+  }
+
   void _onSearch(String value) {
     final q = value.trim();
     setState(() {
@@ -64,23 +75,31 @@ class HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  /// 从别的页面回来后刷新（进度可能变了）。
+  List<WordPair> get _allPairs => [..._userPairs.pairs, ...widget.pairs];
+
+  /// 当前选中的词单。
+  List<WordPair> get _activePairs => switch (SettingsStore.wordList.value) {
+        'builtin' => widget.pairs,
+        'user' => _userPairs.pairs,
+        _ => _allPairs,
+      };
+
+  /// 从别的页面回来后刷新。
   void refresh() {
     if (mounted) setState(() {});
   }
 
-  @override
-  void dispose() {
-    _search.dispose();
-    super.dispose();
-  }
-
-  List<WordPair> get _allPairs => [..._userPairs.pairs, ...widget.pairs];
+  /// 这一批要学的词对：数量就是设置里选的「每组词数」。
+  List<WordPair> get _studyBatch => _progress
+      .unlearned(_activePairs)
+      .take(SettingsStore.learnBatch.value)
+      .toList();
 
   List<WordPair> get _visiblePairs {
-    if (_query.isEmpty) return _allPairs;
+    final base = _showPairs ? _studyBatch : _activePairs;
+    if (_query.isEmpty) return base;
     final q = _query.toLowerCase();
-    return _allPairs.where((pair) {
+    return base.where((pair) {
       return pair.first.form.toLowerCase().contains(q) ||
           pair.second.form.toLowerCase().contains(q) ||
           pair.summary.toLowerCase().contains(q) ||
@@ -88,33 +107,81 @@ class HomeScreenState extends State<HomeScreen> {
     }).toList();
   }
 
-  /// 复习：只复习学过且到期的。
   Future<void> _startReview() async {
-    final queue = _progress.dueQueue(_allPairs);
-    if (queue.isEmpty) return;
+    final queue = _progress.dueQueue(_activePairs);
+    if (queue.isEmpty) {
+      _toast('今天没有到期的词对，点「新学」看看新的');
+      return;
+    }
     await Navigator.of(context).push(
       fadeUpRoute(QuizScreen(pairs: queue, store: _progress)),
     );
     if (mounted) setState(() {});
   }
 
-  /// 学新词：按当前批量取一组，进学习会话。
-  Future<void> _learnNext() async {
-    final queue = _progress.unlearned(_allPairs);
-    if (queue.isEmpty) return;
-    final batch = queue
-        .take(SettingsStore.pairsForWords(SettingsStore.learnBatch.value))
-        .toList();
-    final learned = await Navigator.of(context).push<int>(
-      fadeUpRoute(LearnSessionScreen(pairs: batch, store: _progress)),
+  void _startLearn() {
+    setState(() => _showPairs = true);
+  }
+
+  void _toast(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _openDetail(WordPair pair) async {
+    await Navigator.of(context).push(
+      fadeUpRoute(
+        DetailScreen(pair: pair, store: _progress, userPairs: _userPairs),
+      ),
     );
-    if (!mounted) return;
-    setState(() {});
-    if (learned != null && learned > 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('这一轮学会了 $learned 组')),
-      );
-    }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _pickWordList() async {
+    final p = context.pal;
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: p.bg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        final bp = context.pal;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: bp.divider,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 10),
+              for (final entry in SettingsStore.listOptions.entries)
+                ListTile(
+                  title: Text(
+                    entry.value,
+                    style: TextStyle(fontSize: 14.5, color: bp.ink),
+                  ),
+                  trailing: SettingsStore.wordList.value == entry.key
+                      ? Icon(Icons.check_rounded, size: 18, color: bp.primary)
+                      : null,
+                  onTap: () => Navigator.of(context).pop(entry.key),
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+    if (picked == null) return;
+    await SettingsStore().setWordList(picked);
+    if (mounted) setState(() {});
   }
 
   Future<void> _openLearnedList() async {
@@ -130,11 +197,9 @@ class HomeScreenState extends State<HomeScreen> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _openDetail(WordPair pair) async {
+  Future<void> _openLearnSettings() async {
     await Navigator.of(context).push(
-      fadeUpRoute(
-        DetailScreen(pair: pair, store: _progress, userPairs: _userPairs),
-      ),
+      fadeUpRoute(const LearnSettingsScreen()),
     );
     if (mounted) setState(() {});
   }
@@ -170,91 +235,91 @@ class HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final p = context.pal;
     final visible = _visiblePairs;
-    final loaded = _progress.isLoaded;
-    final due = loaded ? _progress.dueCount(_allPairs) : 0;
-    final toLearn = loaded ? _progress.unlearned(_allPairs).length : 0;
-    final learned = loaded ? _progress.learnedPairs(_allPairs).length : 0;
-    final mastered = loaded ? _progress.masteredPairs(_allPairs).length : 0;
-
-    // 按钮统一叫"开始复习"：有到期的就复习，没到期的就先学新的。
-    final bannerTitle = (due > 0 || toLearn > 0) ? '开始复习' : '今天练完了';
-    final bannerTap = due > 0
-        ? _startReview
-        : toLearn > 0
-            ? _learnNext
-            : null;
+    final due = _progress.dueCount(_activePairs);
+    final toLearn = _progress.unlearned(_activePairs).length;
+    final learned = _progress.learnedPairs(_activePairs).length;
+    final mastered = _progress.masteredPairs(_activePairs).length;
 
     return Scaffold(
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'MEGUMI · 辞書',
-                        style: TextStyle(
-                          fontSize: 11,
-                          letterSpacing: 1.6,
-                          fontWeight: FontWeight.w700,
-                          color: p.muted,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        '背词',
-                        style: TextStyle(
-                          fontSize: 34,
-                          height: 1.1,
-                          fontWeight: FontWeight.w800,
-                          color: p.ink,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            Text(
+              'MEGUMI · 辞書',
+              style: TextStyle(
+                fontSize: 11,
+                letterSpacing: 1.6,
+                fontWeight: FontWeight.w700,
+                color: p.muted,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              '背词',
+              style: TextStyle(
+                fontSize: 34,
+                height: 1.1,
+                fontWeight: FontWeight.w800,
+                color: p.ink,
+              ),
             ),
             const SizedBox(height: 6),
             Text(
               '先看对比学一组，练过才进复习。',
-              style: TextStyle(fontSize: 14, height: 1.6, color: p.muted),
+              style: TextStyle(fontSize: 13.5, height: 1.6, color: p.muted),
             ),
-            const SizedBox(height: 20),
-            const _BatchSelector(),
-            const SizedBox(height: 12),
-            _ReviewBanner(
-              title: bannerTitle,
-              subtitle: _bannerSubtitle(due, toLearn),
-              color: p.primary,
-              foreground: context.isDark
-                  ? const Color(0xFF10231F)
-                  : Colors.white,
-              onTap: bannerTap,
-            ),
-            const SizedBox(height: 12),
-            _StatsRow(store: _progress, userCount: _userPairs.pairs.length),
-            const SizedBox(height: 10),
-            _LearnedEntry(
-              learned: learned,
-              mastered: mastered,
-              fresh: toLearn,
-              onTap: _openLearnedList,
-            ),
-            if (_allPairs.length > 4) ...[
-              const SizedBox(height: 18),
-              _SearchBox(
-                controller: _search,
-                onChanged: _onSearch,
+            const SizedBox(height: 18),
+            SizedBox(
+              height: 286,
+              child: PageView(
+                controller: _cards,
+                children: [
+                  _SummaryCard(
+                    due: due,
+                    learned: learned,
+                    mastered: mastered,
+                    total: _activePairs.length,
+                    listName: SettingsStore.listOptions[SettingsStore.wordList.value] ?? '全部词对',
+                    onPickList: _pickWordList,
+                    unlearned: toLearn,
+                    onReview: _startReview,
+                    onLearn: _startLearn,
+                    onSettings: _openLearnSettings,
+                    onLearned: _openLearnedList,
+                  ),
+                  _ProgressCard(
+                    mastered: mastered,
+                    fresh: toLearn,
+                    own: _userPairs.pairs.length,
+                    accuracy: _progress.overallAccuracy,
+                    onTap: _openLearnedList,
+                  ),
+                ],
               ),
-            ],
+            ),
+            const SizedBox(height: 8),
+            Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < 2; i++)
+                    Container(
+                      width: 6,
+                      height: 6,
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      decoration: BoxDecoration(
+                        color: i == 0 ? p.primary : p.divider,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            _SearchBox(controller: _search, onChanged: _onSearch),
             if (_query.isNotEmpty && _dictResults.isNotEmpty) ...[
-              const SizedBox(height: 22),
+              const SizedBox(height: 18),
               Row(
                 children: [
                   Text(
@@ -282,64 +347,517 @@ class HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
             ],
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Text(
-                  '词对',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: p.ink,
+            if (_showPairs) ...[
+              const SizedBox(height: 22),
+              Row(
+                children: [
+                  Text(
+                    '词对',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: p.ink,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${visible.length} 组',
+                    style: TextStyle(fontSize: 13, color: p.muted),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (visible.isEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 34),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: p.card,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '这一批都学完了',
+                    style: TextStyle(fontSize: 13, color: p.hint),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  '${visible.length} 组',
-                  style: TextStyle(fontSize: 13, color: p.muted),
+              for (final pair in visible)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _PairCard(
+                    pair: pair,
+                    stat: _progress.statFor(pair.id),
+                    onTap: () => _openDetail(pair),
+                    onLongPress:
+                        pair.isUserMade ? () => _deletePair(pair) : null,
+                  ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (visible.isEmpty)
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 34),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: p.card,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '没有匹配的词对',
-                  style: TextStyle(fontSize: 13, color: p.hint),
-                ),
-              ),
-            for (final pair in visible)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _PairCard(
-                  pair: pair,
-                  stat: _progress.statFor(pair.id),
-                  onTap: () => _openDetail(pair),
-                  onLongPress: pair.isUserMade ? () => _deletePair(pair) : null,
-                ),
-              ),
+            ],
           ],
         ),
       ),
     );
   }
+}
 
-  String _bannerSubtitle(int due, int toLearn) {
-    if (!_progress.isLoaded) return '${_allPairs.length} 组词对';
-    if (due > 0) return '$due 组到期 · 按记忆曲线安排';
-    if (toLearn > 0) {
-      return '还有 $toLearn 组没学过 · 先看对比，练一次算学会';
-    }
-    if (_progress.todayCount > 0) {
-      return '今天已练 ${_progress.todayCount} 题 · 明天再来';
-    }
-    return '全部学过了，明天再见';
+/// 主卡：参考词书 App 的布局——封面、书名、预计天数、进度条、复习/新学。
+class _SummaryCard extends StatelessWidget {
+  final int due;
+  final int learned;
+  final int mastered;
+  final int total;
+  final int unlearned;
+  final String listName;
+  final VoidCallback onReview;
+  final VoidCallback onLearn;
+  final VoidCallback onSettings;
+  final VoidCallback onLearned;
+  final VoidCallback onPickList;
+
+  const _SummaryCard({
+    required this.due,
+    required this.learned,
+    required this.mastered,
+    required this.total,
+    required this.unlearned,
+    required this.listName,
+    required this.onReview,
+    required this.onLearn,
+    required this.onSettings,
+    required this.onLearned,
+    required this.onPickList,
+  });
+
+  int get _daysLeft {
+    final perDay = SettingsStore.learnBatch.value;
+    if (unlearned <= 0 || perDay <= 0) return 0;
+    return (unlearned / perDay).ceil();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    const accent = Color(0xFFD93A56);
+    final ratio = total == 0 ? 0.0 : learned / total;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 14, 14),
+      decoration: BoxDecoration(
+        color: p.card,
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _Cover(),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'megumi辞書',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: p.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '共 $total 组',
+                      style: TextStyle(fontSize: 12.5, color: p.muted),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        InkWell(
+                          onTap: onPickList,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '选择词单',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: p.hint,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  listName,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: p.primary,
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.chevron_right_rounded,
+                                  size: 14,
+                                  color: p.hint,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: p.card,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: p.divider),
+                      ),
+                      child: Text.rich(
+                        TextSpan(
+                          style: TextStyle(fontSize: 12, color: p.muted),
+                          children: [
+                            const TextSpan(text: '预计学完还需 '),
+                            TextSpan(
+                              text: _daysLeft > 0 ? '$_daysLeft 天' : '—',
+                              style: const TextStyle(
+                                color: accent,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: onSettings,
+                icon: Icon(Icons.tune_rounded, size: 19, color: p.muted),
+                tooltip: '背词设置',
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: ratio,
+              minHeight: 6,
+              backgroundColor: p.divider.withValues(alpha: 0.6),
+              valueColor: const AlwaysStoppedAnimation<Color>(accent),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _DotStat(count: mastered, label: '掌握', color: accent),
+              const SizedBox(width: 16),
+              _DotStat(count: learned, label: '已学', color: p.hint),
+              const Spacer(),
+              InkWell(
+                onTap: onLearned,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 2,
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        '学习列表',
+                        style: TextStyle(fontSize: 12.5, color: p.muted),
+                      ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 16,
+                        color: p.muted,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: SizedBox(
+                  height: 46,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: accent,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(23),
+                      ),
+                    ),
+                    onPressed: onReview,
+                    child: Text(
+                      due > 0 ? '复习 $due' : '复习',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: SizedBox(
+                  height: 46,
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: p.ink,
+                      side: BorderSide(color: p.divider),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(23),
+                      ),
+                    ),
+                    onPressed: onLearn,
+                    child: const Text(
+                      '新学',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 小书封：深梅底 + 白色 M。
+class _Cover extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 76,
+      height: 104,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF7A2E45), Color(0xFF3A1E2B)],
+        ),
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 7,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.12),
+                borderRadius: const BorderRadius.horizontal(
+                  left: Radius.circular(10),
+                ),
+              ),
+            ),
+          ),
+          const Center(
+            child: Text(
+              'M',
+              style: TextStyle(
+                fontSize: 40,
+                height: 1,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFFFDF0F3),
+                fontFamily: 'serif',
+              ),
+            ),
+          ),
+          Positioned(
+            left: 13,
+            right: 8,
+            bottom: 10,
+            child: Container(
+              height: 2,
+              color: Colors.white.withValues(alpha: 0.35),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DotStat extends StatelessWidget {
+  final int count;
+  final String label;
+  final Color color;
+
+  const _DotStat({
+    required this.count,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          '$label $count',
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: p.ink,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 第二张卡：掌握 / 新学 / 自建。
+class _ProgressCard extends StatelessWidget {
+  final int mastered;
+  final int fresh;
+  final int own;
+  final int accuracy;
+  final VoidCallback onTap;
+
+  const _ProgressCard({
+    required this.mastered,
+    required this.fresh,
+    required this.own,
+    required this.accuracy,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+
+    return Material(
+      color: p.card,
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Spacer(),
+              Row(
+                children: [
+                  _BigStat(
+                    icon: Icons.workspace_premium_rounded,
+                    value: '$mastered',
+                    color: p.success,
+                  ),
+                  const SizedBox(width: 26),
+                  _BigStat(
+                    icon: Icons.fiber_new_rounded,
+                    value: '$fresh',
+                    color: p.primary,
+                  ),
+                  const SizedBox(width: 26),
+                  _BigStat(
+                    icon: Icons.edit_note_rounded,
+                    value: '$own',
+                    color: p.muted,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Icon(
+                    Icons.check_circle_outline_rounded,
+                    size: 16,
+                    color: p.hint,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '正确率 $accuracy%',
+                    style: TextStyle(fontSize: 12.5, color: p.muted),
+                  ),
+                ],
+              ),
+              const Spacer(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BigStat extends StatelessWidget {
+  final IconData icon;
+  final String value;
+  final Color color;
+
+  const _BigStat({
+    required this.icon,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Icon(icon, size: 22, color: color),
+        const SizedBox(width: 7),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            color: color,
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -367,199 +885,6 @@ class _SearchBox extends StatelessWidget {
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
-        ),
-      ),
-    );
-  }
-}
-
-class _StatsRow extends StatelessWidget {
-  final ProgressStore store;
-  final int userCount;
-
-  const _StatsRow({required this.store, required this.userCount});
-
-  @override
-  Widget build(BuildContext context) {
-    if (!store.isLoaded) return const SizedBox.shrink();
-    final p = context.pal;
-
-    return Padding(
-      padding: const EdgeInsets.only(left: 4),
-      child: Row(
-        children: [
-          _Stat(label: '练过', value: '${store.trainedPairs} 组'),
-          const SizedBox(width: 18),
-          _Stat(label: '正确率', value: '${store.overallAccuracy}%'),
-          const Spacer(),
-          Text(
-            userCount == 0 ? '自建 0 组' : '自建 $userCount 组',
-            style: TextStyle(fontSize: 12, color: p.muted),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Stat extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _Stat({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.pal;
-    return Row(
-      children: [
-        Text(label, style: TextStyle(fontSize: 11.5, color: p.hint)),
-        const SizedBox(width: 5),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w700,
-            color: p.ink,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _BatchSelector extends StatelessWidget {
-  const _BatchSelector();
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.pal;
-
-    return ValueListenableBuilder<int>(
-      valueListenable: SettingsStore.learnBatch,
-      builder: (context, batch, _) {
-        return Row(
-          children: [
-            Text(
-              '一次记',
-              style: TextStyle(fontSize: 12.5, color: p.muted),
-            ),
-            const SizedBox(width: 10),
-            for (final n in SettingsStore.batchOptions)
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: _BatchChip(
-                  label: '$n',
-                  selected: n == batch,
-                  onTap: () => SettingsStore().setLearnBatch(n),
-                ),
-              ),
-            const Spacer(),
-            Text(
-              '= ${SettingsStore.pairsForWords(batch)} 组对比',
-              style: TextStyle(fontSize: 11.5, color: p.hint),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _BatchChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _BatchChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.pal;
-
-    return Material(
-      color: selected ? p.primary : p.card,
-      borderRadius: BorderRadius.circular(10),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: selected
-                  ? (context.isDark ? const Color(0xFF10231F) : Colors.white)
-                  : p.muted,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LearnedEntry extends StatelessWidget {
-  final int learned;
-  final int mastered;
-  final int fresh;
-  final VoidCallback onTap;
-
-  const _LearnedEntry({
-    required this.learned,
-    required this.mastered,
-    required this.fresh,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.pal;
-
-    return Material(
-      color: p.card,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            children: [
-              Icon(Icons.workspace_premium_outlined, size: 18, color: p.muted),
-              const SizedBox(width: 10),
-              Text(
-                '已学习 $learned 组',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: p.ink,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '· 掌握 $mastered',
-                style: TextStyle(fontSize: 12, color: p.success),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '· 新学 $fresh',
-                style: TextStyle(fontSize: 12, color: p.hint),
-              ),
-              const Spacer(),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 20,
-                color: p.hint.withValues(alpha: 0.7),
-              ),
-            ],
-          ),
         ),
       ),
     );
@@ -620,91 +945,6 @@ class _DictTile extends StatelessWidget {
   }
 }
 
-class _ReviewBanner extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final Color color;
-  final Color foreground;
-  final VoidCallback? onTap;
-
-  const _ReviewBanner({
-    required this.title,
-    required this.subtitle,
-    required this.color,
-    required this.foreground,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final disabled = onTap == null;
-    final p = context.pal;
-
-    return Material(
-      color: disabled ? p.chipBg : color,
-      borderRadius: BorderRadius.circular(22),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(22),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 18, 20),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: disabled
-                      ? p.hint.withValues(alpha: 0.15)
-                      : foreground.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(
-                  disabled ? Icons.check_rounded : Icons.play_arrow_rounded,
-                  color: disabled ? p.hint : foreground,
-                  size: 26,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: disabled ? p.muted : foreground,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        color: disabled
-                            ? p.hint
-                            : foreground.withValues(alpha: 0.85),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (!disabled)
-                Icon(
-                  Icons.arrow_forward_rounded,
-                  color: foreground.withValues(alpha: 0.9),
-                  size: 20,
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _PairCard extends StatelessWidget {
   final WordPair pair;
   final PairStat stat;
@@ -756,7 +996,11 @@ class _PairCard extends StatelessWidget {
                       pair.summary,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 13, height: 1.5, color: p.muted),
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.5,
+                        color: p.muted,
+                      ),
                     ),
                     const SizedBox(height: 10),
                     Row(

@@ -29,15 +29,10 @@ void main() {
   });
 
   test('可选项是 5 / 15 / 20', () {
-    expect(SettingsStore.batchOptions, [5, 15, 20]);
+    expect(SettingsStore.batchOptions.first, 5);
+    expect(SettingsStore.batchOptions.last, 100);
+    expect(SettingsStore.batchOptions.length, 12);
     expect(SettingsStore.batchOptions.contains(SettingsStore.defaultBatch), isTrue);
-  });
-
-  test('按词数换算成词对组数（一组两个词）', () {
-    expect(SettingsStore.pairsForWords(5), 3); // 5 个词 → 3 组（6 个词）
-    expect(SettingsStore.pairsForWords(15), 8);
-    expect(SettingsStore.pairsForWords(20), 10);
-    expect(SettingsStore.pairsForWords(2), 1);
   });
 
   test('备份时间会记住', () async {

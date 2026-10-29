@@ -6,8 +6,9 @@ class SettingsStore {
   static const _themeKey = 'theme_mode';
   static const _batchKey = 'learn_batch';
   static const _backupKey = 'last_backup_at';
+  static const _listKey = 'word_list';
   static const defaultBatch = 20;
-  static const batchOptions = [5, 15, 20];
+  static const batchOptions = [5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
   /// 全局主题模式，MaterialApp 监听它重建。
   static final ValueNotifier<ThemeMode> themeMode =
@@ -17,8 +18,15 @@ class SettingsStore {
   static final ValueNotifier<int> learnBatch =
       ValueNotifier<int>(defaultBatch);
 
-  /// 一组对比词条含两个单词，所以按"词"选、按"组"学。
-  static int pairsForWords(int words) => (words / 2).ceil();
+
+  /// 词单：all / builtin / user。
+  static const listOptions = <String, String>{
+    'all': '全部词对',
+    'builtin': '内置示例',
+    'user': '自建词对',
+  };
+
+  static final ValueNotifier<String> wordList = ValueNotifier<String>('all');
 
   /// 上次导出备份的时间（毫秒），null 表示从未备份过。
   static final ValueNotifier<int?> lastBackupAt = ValueNotifier<int?>(null);
@@ -36,6 +44,9 @@ class SettingsStore {
     learnBatch.value = batchOptions.contains(batch) ? batch! : defaultBatch;
 
     lastBackupAt.value = prefs.getInt(_backupKey);
+
+    final list = prefs.getString(_listKey);
+    wordList.value = listOptions.containsKey(list) ? list! : 'all';
   }
 
   Future<void> markBackedUp() async {
@@ -43,6 +54,13 @@ class SettingsStore {
     lastBackupAt.value = now;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_backupKey, now);
+  }
+
+  Future<void> setWordList(String id) async {
+    if (!listOptions.containsKey(id)) return;
+    wordList.value = id;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_listKey, id);
   }
 
   Future<void> setLearnBatch(int value) async {
