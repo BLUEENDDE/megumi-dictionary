@@ -32,4 +32,23 @@ void main() {
     expect(SettingsStore.batchOptions, [5, 15, 20]);
     expect(SettingsStore.batchOptions.contains(SettingsStore.defaultBatch), isTrue);
   });
+
+  test('备份时间会记住', () async {
+    SettingsStore.lastBackupAt.value = null;
+    final store = SettingsStore();
+    await store.load();
+    expect(SettingsStore.lastBackupAt.value, isNull);
+
+    await store.markBackedUp();
+
+    final reopened = SettingsStore();
+    await reopened.load();
+    expect(SettingsStore.lastBackupAt.value, isNotNull);
+    expect(
+      SettingsStore.lastBackupAt.value,
+      greaterThan(DateTime.now()
+          .subtract(const Duration(minutes: 1))
+          .millisecondsSinceEpoch),
+    );
+  });
 }

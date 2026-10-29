@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../models/word_pair.dart';
 import '../services/backup_service.dart';
@@ -34,6 +35,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  String _backupHint(int? lastBackup) {
+    if (lastBackup == null) return '还没备份过 · 换设备前务必先导一份';
+    final at = DateTime.fromMillisecondsSinceEpoch(lastBackup);
+    final days = DateTime.now().difference(at).inDays;
+    if (days <= 0) return '上次备份：今天';
+    if (days == 1) return '上次备份：昨天';
+    return '上次备份：$days 天前';
+  }
+
   Future<void> _export() async {
     final text = BackupService.encode(
       userPairs: widget.userPairs.pairs,
@@ -54,7 +64,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '复制下面这段文字，存到备忘录或网盘里。换手机时用「导入备份」粘回来。',
+                  '两种存法：复制到剪贴板，或点「发送到…」直接发到自己的微信 / 邮箱 / 网盘。'
+                  '换手机或重装后，用「导入备份」把这段文字粘回来就能恢复。',
                   style: TextStyle(fontSize: 12.5, height: 1.6, color: p.muted),
                 ),
                 const SizedBox(height: 12),
@@ -85,10 +96,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('关闭'),
             ),
+            TextButton(
+              onPressed: () async {
+                try {
+                  await SharePlus.instance.share(
+                    ShareParams(
+                      text: text,
+                      subject: '印尼语背词 备份',
+                    ),
+                  );
+                  await SettingsStore().markBackedUp();
+                  if (context.mounted) Navigator.of(context).pop();
+                  _toast('已发送，记得把文件存好');
+                } catch (e) {
+                  _toast('分享失败：$e');
+                }
+              },
+              child: const Text('发送到…'),
+            ),
             FilledButton(
               onPressed: () async {
                 await Clipboard.setData(ClipboardData(text: text));
+                await SettingsStore().markBackedUp();
                 if (context.mounted) Navigator.of(context).pop();
+                if (mounted) setState(() {});
                 _toast('已复制到剪贴板');
               },
               child: const Text('复制'),
@@ -301,32 +332,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 24),
           const _SectionTitle('数据'),
-          _Card(
-            child: Column(
-              children: [
-                _Tile(
-                  icon: Icons.upload_rounded,
-                  title: '导出备份',
-                  subtitle: '把词对和进度变成一段文字，复制走',
-                  onTap: _export,
+          ValueListenableBuilder<int?>(
+            valueListenable: SettingsStore.lastBackupAt,
+            builder: (context, lastBackup, _) {
+              return _Card(
+                child: Column(
+                  children: [
+                    _Tile(
+                      icon: Icons.upload_rounded,
+                      title: '导出备份',
+                      subtitle: _backupHint(lastBackup),
+                      onTap: _export,
+                    ),
+                    Divider(color: p.divider, height: 1),
+                    _Tile(
+                      icon: Icons.download_rounded,
+                      title: '导入备份',
+                      subtitle: '粘贴之前导出的文字，恢复数据',
+                      onTap: _import,
+                    ),
+                    Divider(color: p.divider, height: 1),
+                    _Tile(
+                      icon: Icons.restart_alt_rounded,
+                      title: '清空学习进度',
+                      subtitle: '保留词对，只清记录',
+                      danger: true,
+                      onTap: _resetProgress,
+                    ),
+                  ],
                 ),
-                Divider(color: p.divider, height: 1),
-                _Tile(
-                  icon: Icons.download_rounded,
-                  title: '导入备份',
-                  subtitle: '粘贴之前导出的文字，恢复数据',
-                  onTap: _import,
-                ),
-                Divider(color: p.divider, height: 1),
-                _Tile(
-                  icon: Icons.restart_alt_rounded,
-                  title: '清空学习进度',
-                  subtitle: '保留词对，只清记录',
-                  danger: true,
-                  onTap: _resetProgress,
-                ),
-              ],
-            ),
+              );
+            },
           ),
           const SizedBox(height: 24),
           const _SectionTitle('关于'),
@@ -337,7 +373,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 10),
                 _InfoRow(label: '已掌握', value: '${widget.progress.trainedPairs} 组'),
                 const SizedBox(height: 10),
-                _InfoRow(label: '版本', value: '1.1.0'),
+                _InfoRow(label: '版本', value: '1.2.0'),
               ],
             ),
           ),

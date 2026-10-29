@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class SettingsStore {
   static const _themeKey = 'theme_mode';
   static const _batchKey = 'learn_batch';
+  static const _backupKey = 'last_backup_at';
   static const defaultBatch = 20;
   static const batchOptions = [5, 15, 20];
 
@@ -15,6 +16,9 @@ class SettingsStore {
   /// 一次学多少组，首页选择器改它。
   static final ValueNotifier<int> learnBatch =
       ValueNotifier<int>(defaultBatch);
+
+  /// 上次导出备份的时间（毫秒），null 表示从未备份过。
+  static final ValueNotifier<int?> lastBackupAt = ValueNotifier<int?>(null);
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -27,6 +31,15 @@ class SettingsStore {
 
     final batch = prefs.getInt(_batchKey);
     learnBatch.value = batchOptions.contains(batch) ? batch! : defaultBatch;
+
+    lastBackupAt.value = prefs.getInt(_backupKey);
+  }
+
+  Future<void> markBackedUp() async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    lastBackupAt.value = now;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_backupKey, now);
   }
 
   Future<void> setLearnBatch(int value) async {
