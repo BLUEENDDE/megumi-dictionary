@@ -2,20 +2,51 @@ import 'package:flutter/material.dart';
 
 import '../models/word_pair.dart';
 import '../services/progress_store.dart';
+import '../services/user_pairs_store.dart';
+import '../theme/palette.dart';
 import '../widgets/ui_kit.dart';
+import 'add_pair_screen.dart';
 import 'quiz_screen.dart';
 
-class DetailScreen extends StatelessWidget {
+class DetailScreen extends StatefulWidget {
   final WordPair pair;
   final ProgressStore store;
+  final UserPairsStore? userPairs;
 
-  const DetailScreen({super.key, required this.pair, required this.store});
+  const DetailScreen({
+    super.key,
+    required this.pair,
+    required this.store,
+    this.userPairs,
+  });
+
+  @override
+  State<DetailScreen> createState() => _DetailScreenState();
+}
+
+class _DetailScreenState extends State<DetailScreen> {
+  late WordPair _pair;
+
+  @override
+  void initState() {
+    super.initState();
+    _pair = widget.pair;
+  }
+
+  Future<void> _edit() async {
+    final updated = await Navigator.of(context).push<WordPair>(
+      fadeUpRoute(AddPairScreen(initial: _pair)),
+    );
+    if (updated == null) return;
+    await widget.userPairs?.update(updated);
+    if (!mounted) return;
+    setState(() => _pair = updated);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    const ink = Color(0xFF1C1B18);
-    const muted = Color(0xFF6B6A63);
+    final p = context.pal;
+    final editable = _pair.isUserMade && widget.userPairs != null;
 
     return Scaffold(
       appBar: AppBar(
@@ -23,35 +54,39 @@ class DetailScreen extends StatelessWidget {
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
-        title: Text('${pair.first.form} / ${pair.second.form}'),
+        title: Text('${_pair.first.form} / ${_pair.second.form}'),
+        actions: [
+          if (editable)
+            IconButton(
+              onPressed: _edit,
+              icon: const Icon(Icons.edit_outlined, size: 20),
+              tooltip: '编辑',
+            ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
         children: [
-          _Header(pair: pair, scheme: scheme),
+          _Header(pair: _pair),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: scheme.primary.withValues(alpha: 0.07),
+              color: p.primary.withValues(alpha: 0.09),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.lightbulb_outline_rounded,
-                  size: 18,
-                  color: scheme.primary,
-                ),
+                Icon(Icons.lightbulb_outline_rounded, size: 18, color: p.primary),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    pair.summary,
+                    _pair.summary,
                     style: TextStyle(
                       fontSize: 13.5,
                       height: 1.6,
-                      color: scheme.primary.withValues(alpha: 0.95),
+                      color: p.primary,
                     ),
                   ),
                 ),
@@ -59,54 +94,65 @@ class DetailScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 26),
-          const Text(
+          Text(
             '差异板块',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
-              color: ink,
+              color: p.ink,
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             '一条轴看一个区别，逐条比过去',
-            style: TextStyle(fontSize: 12.5, color: muted),
+            style: TextStyle(fontSize: 12.5, color: p.muted),
           ),
           const SizedBox(height: 12),
-          for (final axis in pair.axes)
+          if (_pair.axes.isEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 22),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: p.card,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Text(
+                '这组还没写板块，编辑时可以补上',
+                style: TextStyle(fontSize: 12.5, color: p.hint),
+              ),
+            ),
+          for (final axis in _pair.axes)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: _AxisCard(pair: pair, axis: axis, scheme: scheme),
+              child: _AxisCard(pair: _pair, axis: axis),
             ),
           const SizedBox(height: 18),
-          const Text(
+          Text(
             '最小对比句',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
-              color: ink,
+              color: p.ink,
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             '同一件事，两个词说出来的味道不一样',
-            style: TextStyle(fontSize: 12.5, color: muted),
+            style: TextStyle(fontSize: 12.5, color: p.muted),
           ),
           const SizedBox(height: 12),
           _ExampleCard(
-            word: pair.first.form,
-            sentence: pair.example.firstText,
-            gloss: pair.example.firstGloss,
-            note: pair.example.firstNote,
-            scheme: scheme,
+            word: _pair.first.form,
+            sentence: _pair.example.firstText,
+            gloss: _pair.example.firstGloss,
+            note: _pair.example.firstNote,
           ),
           const SizedBox(height: 10),
           _ExampleCard(
-            word: pair.second.form,
-            sentence: pair.example.secondText,
-            gloss: pair.example.secondGloss,
-            note: pair.example.secondNote,
-            scheme: scheme,
+            word: _pair.second.form,
+            sentence: _pair.example.secondText,
+            gloss: _pair.example.secondGloss,
+            note: _pair.example.secondNote,
           ),
         ],
       ),
@@ -116,14 +162,17 @@ class DetailScreen extends StatelessWidget {
           height: 52,
           child: FilledButton.icon(
             style: FilledButton.styleFrom(
-              backgroundColor: scheme.primary,
+              backgroundColor: p.primary,
+              foregroundColor: context.isDark
+                  ? const Color(0xFF10231F)
+                  : Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
             ),
             onPressed: () {
               Navigator.of(context).push(
-                fadeUpRoute(QuizScreen(pairs: [pair], store: store)),
+                fadeUpRoute(QuizScreen(pairs: [_pair], store: widget.store)),
               );
             },
             icon: const Icon(Icons.bolt_rounded, size: 20),
@@ -140,18 +189,17 @@ class DetailScreen extends StatelessWidget {
 
 class _Header extends StatelessWidget {
   final WordPair pair;
-  final ColorScheme scheme;
 
-  const _Header({required this.pair, required this.scheme});
+  const _Header({required this.pair});
 
   @override
   Widget build(BuildContext context) {
-    const muted = Color(0xFF6B6A63);
+    final p = context.pal;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 22, 18, 22),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: p.card,
         borderRadius: BorderRadius.circular(22),
       ),
       child: Row(
@@ -162,15 +210,15 @@ class _Header extends StatelessWidget {
             margin: const EdgeInsets.symmetric(horizontal: 10),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
             decoration: BoxDecoration(
-              color: const Color(0xFFF1EFE9),
+              color: p.chipBg,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Text(
+            child: Text(
               'vs',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
-                color: muted,
+                color: p.muted,
                 letterSpacing: 0.5,
               ),
             ),
@@ -189,25 +237,23 @@ class _Side extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const ink = Color(0xFF1C1B18);
-    const muted = Color(0xFF6B6A63);
-
+    final p = context.pal;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           sense.form,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 24,
             height: 1.2,
             fontWeight: FontWeight.w800,
-            color: ink,
+            color: p.ink,
           ),
         ),
         const SizedBox(height: 8),
         Text(
           sense.gloss,
-          style: const TextStyle(fontSize: 12.5, height: 1.5, color: muted),
+          style: TextStyle(fontSize: 12.5, height: 1.5, color: p.muted),
         ),
       ],
     );
@@ -217,22 +263,17 @@ class _Side extends StatelessWidget {
 class _AxisCard extends StatelessWidget {
   final WordPair pair;
   final ContrastAxis axis;
-  final ColorScheme scheme;
 
-  const _AxisCard({
-    required this.pair,
-    required this.axis,
-    required this.scheme,
-  });
+  const _AxisCard({required this.pair, required this.axis});
 
   @override
   Widget build(BuildContext context) {
-    const ink = Color(0xFF1C1B18);
+    final p = context.pal;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: p.card,
         borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
@@ -244,7 +285,7 @@ class _AxisCard extends StatelessWidget {
               fontSize: 11.5,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.6,
-              color: scheme.primary,
+              color: p.primary,
             ),
           ),
           const SizedBox(height: 12),
@@ -252,24 +293,16 @@ class _AxisCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: _Cell(
-                  word: pair.first.form,
-                  text: axis.first,
-                  color: ink,
-                ),
+                child: _Cell(word: pair.first.form, text: axis.first),
               ),
               Container(
                 width: 1,
                 height: 44,
                 margin: const EdgeInsets.symmetric(horizontal: 12),
-                color: const Color(0xFFEDEBE4),
+                color: p.divider,
               ),
               Expanded(
-                child: _Cell(
-                  word: pair.second.form,
-                  text: axis.second,
-                  color: ink,
-                ),
+                child: _Cell(word: pair.second.form, text: axis.second),
               ),
             ],
           ),
@@ -282,27 +315,27 @@ class _AxisCard extends StatelessWidget {
 class _Cell extends StatelessWidget {
   final String word;
   final String text;
-  final Color color;
 
-  const _Cell({required this.word, required this.text, required this.color});
+  const _Cell({required this.word, required this.text});
 
   @override
   Widget build(BuildContext context) {
+    final p = context.pal;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           word,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 10.5,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF9A988F),
+            color: p.hint,
           ),
         ),
         const SizedBox(height: 5),
         Text(
-          text,
-          style: TextStyle(fontSize: 13, height: 1.55, color: color),
+          text.isEmpty ? '—' : text,
+          style: TextStyle(fontSize: 13, height: 1.55, color: p.ink),
         ),
       ],
     );
@@ -314,72 +347,74 @@ class _ExampleCard extends StatelessWidget {
   final String sentence;
   final String gloss;
   final String note;
-  final ColorScheme scheme;
 
   const _ExampleCard({
     required this.word,
     required this.sentence,
     required this.gloss,
     required this.note,
-    required this.scheme,
   });
 
   @override
   Widget build(BuildContext context) {
-    const ink = Color(0xFF1C1B18);
-    const muted = Color(0xFF6B6A63);
+    final p = context.pal;
+
+    if (sentence.trim().isEmpty) {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        decoration: BoxDecoration(
+          color: p.card,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Text(
+          '$word 还没有例句，编辑时补一条',
+          style: TextStyle(fontSize: 12.5, color: p.hint),
+        ),
+      );
+    }
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: p.card,
         borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 3,
-                ),
-                decoration: BoxDecoration(
-                  color: scheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  word,
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    color: scheme.primary,
-                  ),
-                ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: p.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              word,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                color: p.primary,
               ),
-            ],
+            ),
           ),
           const SizedBox(height: 10),
           highlightedText(
             sentence,
             word,
-            style: const TextStyle(fontSize: 15, height: 1.55, color: ink),
-            highlightColor: scheme.primary,
+            style: TextStyle(fontSize: 15, height: 1.55, color: p.ink),
+            highlightColor: p.primary,
           ),
-          const SizedBox(height: 6),
-          Text(
-            gloss,
-            style: const TextStyle(fontSize: 12.5, height: 1.5, color: muted),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            note,
-            style: const TextStyle(
-              fontSize: 11.5,
-              color: Color(0xFF9A988F),
+          if (gloss.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              gloss,
+              style: TextStyle(fontSize: 12.5, height: 1.5, color: p.muted),
             ),
-          ),
+          ],
+          if (note.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(note, style: TextStyle(fontSize: 11.5, color: p.hint)),
+          ],
         ],
       ),
     );

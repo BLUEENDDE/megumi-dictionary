@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import '../models/word_pair.dart';
 import '../services/progress_store.dart';
 import '../services/user_pairs_store.dart';
+import '../theme/palette.dart';
 import '../widgets/ui_kit.dart';
 import 'add_pair_screen.dart';
 import 'detail_screen.dart';
 import 'quiz_screen.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final List<WordPair> pairs;
@@ -54,10 +56,11 @@ class _HomeScreenState extends State<HomeScreen> {
     }).toList();
   }
 
-  Future<void> _openQuiz(List<WordPair> pairs) async {
-    if (pairs.isEmpty) return;
+  Future<void> _openQuiz() async {
+    final queue = _progress.orderForReview(_allPairs);
+    if (queue.isEmpty) return;
     await Navigator.of(context).push(
-      fadeUpRoute(QuizScreen(pairs: pairs, store: _progress)),
+      fadeUpRoute(QuizScreen(pairs: queue, store: _progress)),
     );
     if (mounted) setState(() {});
   }
@@ -74,38 +77,41 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _deletePair(WordPair pair) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('删除这组词对？'),
-        content: Text('${pair.first.form} / ${pair.second.form} 会被删掉，不能恢复。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('算了'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('删除', style: TextStyle(color: Color(0xFFC2453E))),
-          ),
-        ],
-      ),
+      builder: (context) {
+        final p = context.pal;
+        return AlertDialog(
+          title: const Text('删除这组词对？'),
+          content: Text('${pair.first.form} / ${pair.second.form} 会被删掉，不能恢复。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('算了'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text('删除', style: TextStyle(color: p.danger)),
+            ),
+          ],
+        );
+      },
     );
     if (confirmed != true) return;
     await _userPairs.remove(pair.id);
+    await _progress.forget(pair.id);
     if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    const ink = Color(0xFF1C1B18);
-    const muted = Color(0xFF6B6A63);
+    final p = context.pal;
     final visible = _visiblePairs;
+    final due = _progress.isLoaded ? _progress.dueCount(_allPairs) : 0;
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addPair,
-        backgroundColor: scheme.primary,
-        foregroundColor: Colors.white,
+        backgroundColor: p.primary,
+        foregroundColor: context.isDark ? const Color(0xFF10231F) : Colors.white,
         icon: const Icon(Icons.add_rounded, size: 20),
         label: const Text(
           '添加词对',
@@ -116,35 +122,67 @@ class _HomeScreenState extends State<HomeScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),
           children: [
-            const Text(
-              'INDONESIAN · 辨析',
-              style: TextStyle(
-                fontSize: 11,
-                letterSpacing: 1.6,
-                fontWeight: FontWeight.w700,
-                color: muted,
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'INDONESIAN · 辨析',
+                        style: TextStyle(
+                          fontSize: 11,
+                          letterSpacing: 1.6,
+                          fontWeight: FontWeight.w700,
+                          color: p.muted,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        '易混词',
+                        style: TextStyle(
+                          fontSize: 34,
+                          height: 1.1,
+                          fontWeight: FontWeight.w800,
+                          color: p.ink,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () async {
+                    await Navigator.of(context).push(
+                      fadeUpRoute(
+                        SettingsScreen(
+                          progress: _progress,
+                          userPairs: _userPairs,
+                        ),
+                      ),
+                    );
+                    await _load();
+                  },
+                  icon: const Icon(Icons.settings_outlined, size: 21),
+                  color: p.muted,
+                  tooltip: '设置',
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-            const Text(
-              '易混词',
-              style: TextStyle(
-                fontSize: 34,
-                height: 1.1,
-                fontWeight: FontWeight.w800,
-                color: ink,
-              ),
-            ),
-            const SizedBox(height: 10),
-            const Text(
+            const SizedBox(height: 6),
+            Text(
               '一次只比两个词，比一遍遍背释义有用。',
-              style: TextStyle(fontSize: 14, height: 1.6, color: muted),
+              style: TextStyle(fontSize: 14, height: 1.6, color: p.muted),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 22),
             _ReviewBanner(
-              subtitle: _bannerSubtitle(),
-              color: scheme.primary,
-              onTap: () => _openQuiz(_allPairs),
+              title: due > 0 ? '开始复习' : '随便练练',
+              subtitle: _bannerSubtitle(due),
+              color: p.primary,
+              foreground: context.isDark
+                  ? const Color(0xFF10231F)
+                  : Colors.white,
+              onTap: _openQuiz,
             ),
             const SizedBox(height: 12),
             _StatsRow(store: _progress, userCount: _userPairs.pairs.length),
@@ -158,18 +196,18 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 22),
             Row(
               children: [
-                const Text(
+                Text(
                   '词对',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: ink,
+                    color: p.ink,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   '${visible.length} 组',
-                  style: const TextStyle(fontSize: 13, color: muted),
+                  style: TextStyle(fontSize: 13, color: p.muted),
                 ),
               ],
             ),
@@ -179,12 +217,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 34),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: p.card,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Text(
+                child: Text(
                   '没有匹配的词对',
-                  style: TextStyle(fontSize: 13, color: Color(0xFF9A988F)),
+                  style: TextStyle(fontSize: 13, color: p.hint),
                 ),
               ),
             for (final pair in visible)
@@ -196,13 +234,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   onTap: () async {
                     await Navigator.of(context).push(
                       fadeUpRoute(
-                        DetailScreen(pair: pair, store: _progress),
+                        DetailScreen(
+                          pair: pair,
+                          store: _progress,
+                          userPairs: _userPairs,
+                        ),
                       ),
                     );
                     if (mounted) setState(() {});
                   },
-                  onLongPress:
-                      pair.isUserMade ? () => _deletePair(pair) : null,
+                  onLongPress: pair.isUserMade ? () => _deletePair(pair) : null,
                 ),
               ),
           ],
@@ -211,12 +252,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String _bannerSubtitle() {
+  String _bannerSubtitle(int due) {
     if (!_progress.isLoaded) return '${_allPairs.length} 组词对';
-    if (_progress.todayCount == 0) {
-      return '${_allPairs.length} 组词对 · 约两分钟';
+    if (due > 0) return '$due 组到期 · 按记忆曲线安排';
+    if (_progress.todayCount > 0) {
+      return '今天已练 ${_progress.todayCount} 题 · 明天再来';
     }
-    return '今天已练 ${_progress.todayCount} 题 · 继续加油';
+    return '${_allPairs.length} 组词对 · 约两分钟';
   }
 }
 
@@ -228,21 +270,18 @@ class _SearchBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.pal;
     return TextField(
       controller: controller,
       onChanged: onChanged,
-      style: const TextStyle(fontSize: 14, color: Color(0xFF1C1B18)),
+      style: TextStyle(fontSize: 14, color: p.ink),
       decoration: InputDecoration(
         hintText: '搜词或关键词',
-        hintStyle: const TextStyle(fontSize: 13.5, color: Color(0xFFB0ADA3)),
-        prefixIcon: const Icon(
-          Icons.search_rounded,
-          size: 19,
-          color: Color(0xFF9A988F),
-        ),
+        hintStyle: TextStyle(fontSize: 13.5, color: p.hint),
+        prefixIcon: Icon(Icons.search_rounded, size: 19, color: p.hint),
         isDense: true,
         filled: true,
-        fillColor: Colors.white,
+        fillColor: p.card,
         contentPadding: const EdgeInsets.symmetric(vertical: 13),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -262,8 +301,7 @@ class _StatsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!store.isLoaded) return const SizedBox.shrink();
-
-    const muted = Color(0xFF8E8C82);
+    final p = context.pal;
 
     return Padding(
       padding: const EdgeInsets.only(left: 4),
@@ -275,7 +313,7 @@ class _StatsRow extends StatelessWidget {
           const Spacer(),
           Text(
             userCount == 0 ? '自建 0 组' : '自建 $userCount 组',
-            style: const TextStyle(fontSize: 12, color: muted),
+            style: TextStyle(fontSize: 12, color: p.muted),
           ),
         ],
       ),
@@ -291,19 +329,17 @@ class _Stat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.pal;
     return Row(
       children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 11.5, color: Color(0xFF9A988F)),
-        ),
+        Text(label, style: TextStyle(fontSize: 11.5, color: p.hint)),
         const SizedBox(width: 5),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12.5,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF4A4941),
+            color: p.ink,
           ),
         ),
       ],
@@ -312,13 +348,17 @@ class _Stat extends StatelessWidget {
 }
 
 class _ReviewBanner extends StatelessWidget {
+  final String title;
   final String subtitle;
   final Color color;
+  final Color foreground;
   final VoidCallback onTap;
 
   const _ReviewBanner({
+    required this.title,
     required this.subtitle,
     required this.color,
+    required this.foreground,
     required this.onTap,
   });
 
@@ -338,12 +378,12 @@ class _ReviewBanner extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
+                  color: foreground.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.play_arrow_rounded,
-                  color: Colors.white,
+                  color: foreground,
                   size: 26,
                 ),
               ),
@@ -352,12 +392,12 @@ class _ReviewBanner extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      '开始复习',
+                    Text(
+                      title,
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                        color: foreground,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -365,7 +405,7 @@ class _ReviewBanner extends StatelessWidget {
                       subtitle,
                       style: TextStyle(
                         fontSize: 12.5,
-                        color: Colors.white.withValues(alpha: 0.85),
+                        color: foreground.withValues(alpha: 0.85),
                       ),
                     ),
                   ],
@@ -373,7 +413,7 @@ class _ReviewBanner extends StatelessWidget {
               ),
               Icon(
                 Icons.arrow_forward_rounded,
-                color: Colors.white.withValues(alpha: 0.9),
+                color: foreground.withValues(alpha: 0.9),
                 size: 20,
               ),
             ],
@@ -399,12 +439,10 @@ class _PairCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    const ink = Color(0xFF1C1B18);
-    const muted = Color(0xFF6B6A63);
+    final p = context.pal;
 
     return Material(
-      color: Colors.white,
+      color: p.card,
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
@@ -420,38 +458,16 @@ class _PairCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Flexible(
-                          child: Text(
-                            pair.first.form,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: ink,
-                            ),
-                          ),
-                        ),
+                        Flexible(child: _word(pair.first.form, p)),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           child: Icon(
                             Icons.compare_arrows_rounded,
                             size: 16,
-                            color: scheme.primary.withValues(alpha: 0.7),
+                            color: p.primary.withValues(alpha: 0.7),
                           ),
                         ),
-                        Flexible(
-                          child: Text(
-                            pair.second.form,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: ink,
-                            ),
-                          ),
-                        ),
+                        Flexible(child: _word(pair.second.form, p)),
                       ],
                     ),
                     const SizedBox(height: 7),
@@ -459,11 +475,7 @@ class _PairCard extends StatelessWidget {
                       pair.summary,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        height: 1.5,
-                        color: muted,
-                      ),
+                      style: TextStyle(fontSize: 13, height: 1.5, color: p.muted),
                     ),
                     const SizedBox(height: 10),
                     Row(
@@ -474,7 +486,7 @@ class _PairCard extends StatelessWidget {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: scheme.primary.withValues(alpha: 0.08),
+                            color: p.primary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(7),
                           ),
                           child: Text(
@@ -482,7 +494,7 @@ class _PairCard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: scheme.primary,
+                              color: p.primary,
                             ),
                           ),
                         ),
@@ -491,10 +503,7 @@ class _PairCard extends StatelessWidget {
                           stat.untrained
                               ? '还没练过'
                               : '练 ${stat.seen} 次 · ${stat.accuracyPercent}%',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF9A988F),
-                          ),
+                          style: TextStyle(fontSize: 11, color: p.hint),
                         ),
                       ],
                     ),
@@ -502,10 +511,10 @@ class _PairCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 6),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
                 size: 22,
-                color: Color(0xFFB9B7AE),
+                color: p.hint.withValues(alpha: 0.6),
               ),
             ],
           ),
@@ -513,4 +522,15 @@ class _PairCard extends StatelessWidget {
       ),
     );
   }
+
+  Widget _word(String text, Palette p) => Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          color: p.ink,
+        ),
+      );
 }

@@ -45,6 +45,23 @@ class UserPairsStore {
     await _save();
   }
 
+  Future<void> update(WordPair pair) async {
+    final index = _pairs.indexWhere((p) => p.id == pair.id);
+    if (index >= 0) {
+      _pairs[index] = pair;
+    } else {
+      _pairs.insert(0, pair);
+    }
+    await _save();
+  }
+
+  Future<void> replaceAll(List<WordPair> pairs) async {
+    _pairs
+      ..clear()
+      ..addAll(pairs);
+    await _save();
+  }
+
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
     final data = _pairs.map((pair) => pair.toJson()).toList();

@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../models/word_pair.dart';
-
-const _ink = Color(0xFF1C1B18);
-const _hint = Color(0xFF9A988F);
+import '../theme/palette.dart';
 
 class AddPairScreen extends StatefulWidget {
-  const AddPairScreen({super.key});
+  /// 传了就是编辑，没传就是新建。
+  final WordPair? initial;
+
+  const AddPairScreen({super.key, this.initial});
 
   @override
   State<AddPairScreen> createState() => _AddPairScreenState();
@@ -17,10 +18,10 @@ class _AxisDraft {
   final TextEditingController first;
   final TextEditingController second;
 
-  _AxisDraft()
-      : name = TextEditingController(),
-        first = TextEditingController(),
-        second = TextEditingController();
+  _AxisDraft({String name = '', String first = '', String second = ''})
+      : name = TextEditingController(text: name),
+        first = TextEditingController(text: first),
+        second = TextEditingController(text: second);
 
   void dispose() {
     name.dispose();
@@ -30,19 +31,59 @@ class _AxisDraft {
 }
 
 class _AddPairScreenState extends State<AddPairScreen> {
-  final _formA = TextEditingController();
-  final _glossA = TextEditingController();
-  final _formB = TextEditingController();
-  final _glossB = TextEditingController();
-  final _summary = TextEditingController();
-  final _tag = TextEditingController();
+  late final TextEditingController _formA;
+  late final TextEditingController _glossA;
+  late final TextEditingController _formB;
+  late final TextEditingController _glossB;
+  late final TextEditingController _summary;
+  late final TextEditingController _tag;
+  late final TextEditingController _sentenceA;
+  late final TextEditingController _glossSentenceA;
+  late final TextEditingController _sentenceB;
+  late final TextEditingController _glossSentenceB;
 
-  final _sentenceA = TextEditingController();
-  final _glossSentenceA = TextEditingController();
-  final _sentenceB = TextEditingController();
-  final _glossSentenceB = TextEditingController();
+  final List<_AxisDraft> _axes = [];
 
-  final List<_AxisDraft> _axes = [_AxisDraft()];
+  bool get _isEditing => widget.initial != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+
+    _formA = TextEditingController(text: initial?.first.form ?? '');
+    _glossA = TextEditingController(
+      text: initial == null || initial.first.gloss == '（还没写释义）'
+          ? ''
+          : initial.first.gloss,
+    );
+    _formB = TextEditingController(text: initial?.second.form ?? '');
+    _glossB = TextEditingController(
+      text: initial == null || initial.second.gloss == '（还没写释义）'
+          ? ''
+          : initial.second.gloss,
+    );
+    _summary = TextEditingController(text: initial?.summary ?? '');
+    _tag = TextEditingController(
+      text: initial == null || initial.tag == '自建' ? '' : initial.tag,
+    );
+    _sentenceA = TextEditingController(text: initial?.example.firstText ?? '');
+    _glossSentenceA =
+        TextEditingController(text: initial?.example.firstGloss ?? '');
+    _sentenceB = TextEditingController(text: initial?.example.secondText ?? '');
+    _glossSentenceB =
+        TextEditingController(text: initial?.example.secondGloss ?? '');
+
+    if (initial != null && initial.axes.isNotEmpty) {
+      for (final axis in initial.axes) {
+        _axes.add(
+          _AxisDraft(name: axis.name, first: axis.first, second: axis.second),
+        );
+      }
+    } else {
+      _axes.add(_AxisDraft());
+    }
+  }
 
   @override
   void dispose() {
@@ -69,13 +110,7 @@ class _AddPairScreenState extends State<AddPairScreen> {
   void _toast(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _save() {
@@ -88,7 +123,7 @@ class _AddPairScreenState extends State<AddPairScreen> {
       return;
     }
     if (summary.isEmpty) {
-      _toast('写一句"差在哪"，这是这个词对的灵魂');
+      _toast('写一句「差在哪」，这是这个词对的灵魂');
       return;
     }
 
@@ -106,7 +141,8 @@ class _AddPairScreenState extends State<AddPairScreen> {
     }
 
     final pair = WordPair(
-      id: 'user-${DateTime.now().millisecondsSinceEpoch}',
+      id: widget.initial?.id ??
+          'user-${DateTime.now().millisecondsSinceEpoch}',
       tag: _tag.text.trim().isEmpty ? '自建' : _tag.text.trim(),
       summary: summary,
       first: WordSense(
@@ -133,6 +169,7 @@ class _AddPairScreenState extends State<AddPairScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.pal;
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -141,7 +178,7 @@ class _AddPairScreenState extends State<AddPairScreen> {
           icon: const Icon(Icons.close_rounded),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
-        title: const Text('添加词对'),
+        title: Text(_isEditing ? '编辑词对' : '添加词对'),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
@@ -165,11 +202,19 @@ class _AddPairScreenState extends State<AddPairScreen> {
           const _SectionLabel('两个词'),
           _Field(label: '词 A', hint: '例如 besar', controller: _formA),
           const SizedBox(height: 10),
-          _Field(label: 'A 的意思', hint: '例如 大（体积、尺寸）', controller: _glossA),
+          _Field(
+            label: 'A 的意思',
+            hint: '例如 大（体积、尺寸）',
+            controller: _glossA,
+          ),
           const SizedBox(height: 16),
           _Field(label: '词 B', hint: '例如 luas', controller: _formB),
           const SizedBox(height: 10),
-          _Field(label: 'B 的意思', hint: '例如 大（面积、范围）', controller: _glossB),
+          _Field(
+            label: 'B 的意思',
+            hint: '例如 大（面积、范围）',
+            controller: _glossB,
+          ),
           const SizedBox(height: 24),
           const _SectionLabel('差在哪'),
           _Field(
@@ -192,11 +237,11 @@ class _AddPairScreenState extends State<AddPairScreen> {
               ),
             ],
           ),
-          const Padding(
-            padding: EdgeInsets.only(bottom: 10),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
             child: Text(
               '一条轴看一个区别，比如「适用对象」「常见搭配」「语域」。留空不填也行。',
-              style: TextStyle(fontSize: 12, height: 1.5, color: _hint),
+              style: TextStyle(fontSize: 12, height: 1.5, color: p.hint),
             ),
           ),
           for (var i = 0; i < _axes.length; i++)
@@ -254,6 +299,7 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.pal;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Text(
@@ -262,7 +308,7 @@ class _SectionLabel extends StatelessWidget {
           fontSize: 11.5,
           letterSpacing: 1.2,
           fontWeight: FontWeight.w700,
-          color: Theme.of(context).colorScheme.primary,
+          color: p.primary,
         ),
       ),
     );
@@ -284,17 +330,18 @@ class _Field extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.pal;
     return TextField(
       controller: controller,
       maxLines: maxLines,
-      style: const TextStyle(fontSize: 15, color: _ink),
+      style: TextStyle(fontSize: 15, color: p.ink),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        labelStyle: const TextStyle(fontSize: 12.5, color: _hint),
-        hintStyle: const TextStyle(fontSize: 13.5, color: Color(0xFFC3C0B6)),
+        labelStyle: TextStyle(fontSize: 12.5, color: p.hint),
+        hintStyle: TextStyle(fontSize: 13.5, color: p.hint.withValues(alpha: 0.7)),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: p.card,
         contentPadding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -303,7 +350,7 @@ class _Field extends StatelessWidget {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
+            color: p.primary.withValues(alpha: 0.5),
             width: 1.4,
           ),
         ),
@@ -327,10 +374,12 @@ class _AxisCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.pal;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 8, 8, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: p.card,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -339,10 +388,10 @@ class _AxisCard extends StatelessWidget {
             children: [
               Text(
                 '轴 ${index + 1}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11.5,
                   fontWeight: FontWeight.w700,
-                  color: _hint,
+                  color: p.hint,
                 ),
               ),
               const Spacer(),
@@ -351,31 +400,32 @@ class _AxisCard extends StatelessWidget {
                   onPressed: onRemove,
                   icon: const Icon(Icons.remove_circle_outline_rounded),
                   iconSize: 18,
-                  color: _hint,
+                  color: p.hint,
                   visualDensity: VisualDensity.compact,
                 ),
             ],
           ),
           TextField(
             controller: draft.name,
-            style: const TextStyle(fontSize: 14, color: _ink),
-            decoration: const InputDecoration(
+            style: TextStyle(fontSize: 14, color: p.ink),
+            decoration: InputDecoration(
               hintText: '这条轴叫什么，例如「语域」',
-              hintStyle: TextStyle(fontSize: 13, color: Color(0xFFC3C0B6)),
+              hintStyle: TextStyle(fontSize: 13, color: p.hint.withValues(alpha: 0.7)),
               isDense: true,
               border: InputBorder.none,
             ),
           ),
-          const Divider(height: 18, color: Color(0xFFEDEBE4)),
+          Divider(height: 18, color: p.divider),
           Row(
             children: [
               Expanded(
                 child: TextField(
                   controller: draft.first,
-                  style: const TextStyle(fontSize: 13.5, color: _ink),
-                  decoration: const InputDecoration(
+                  style: TextStyle(fontSize: 13.5, color: p.ink),
+                  decoration: InputDecoration(
                     hintText: '词 A 在这条轴上',
-                    hintStyle: TextStyle(fontSize: 12.5, color: Color(0xFFC3C0B6)),
+                    hintStyle:
+                        TextStyle(fontSize: 12.5, color: p.hint.withValues(alpha: 0.7)),
                     isDense: true,
                     border: InputBorder.none,
                   ),
@@ -385,10 +435,11 @@ class _AxisCard extends StatelessWidget {
               Expanded(
                 child: TextField(
                   controller: draft.second,
-                  style: const TextStyle(fontSize: 13.5, color: _ink),
-                  decoration: const InputDecoration(
+                  style: TextStyle(fontSize: 13.5, color: p.ink),
+                  decoration: InputDecoration(
                     hintText: '词 B 在这条轴上',
-                    hintStyle: TextStyle(fontSize: 12.5, color: Color(0xFFC3C0B6)),
+                    hintStyle:
+                        TextStyle(fontSize: 12.5, color: p.hint.withValues(alpha: 0.7)),
                     isDense: true,
                     border: InputBorder.none,
                   ),

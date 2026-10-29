@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../models/word_pair.dart';
 import '../services/progress_store.dart';
+import '../theme/palette.dart';
 
 enum _OptionState { idle, correct, wrong, dim }
 
@@ -63,8 +64,6 @@ class _QuizScreenState extends State<QuizScreen>
     super.dispose();
   }
 
-  // ---------- 出题 ----------
-
   List<QuizItem> _buildItems(List<WordPair> pairs) {
     final random = math.Random();
     final items = <QuizItem>[];
@@ -78,7 +77,7 @@ class _QuizScreenState extends State<QuizScreen>
       final gloss = useFirst ? pair.example.firstGloss : pair.example.secondGloss;
       final note = useFirst ? pair.example.firstNote : pair.example.secondNote;
 
-      // 例句里没有目标词就出不了填空题，跳过这一组（用户自建的可能没填例句）。
+      // 例句里没有目标词就出不了填空题，跳过（用户自建的可能没填例句）。
       if (!sentence.toLowerCase().contains(answer.toLowerCase())) {
         continue;
       }
@@ -107,8 +106,6 @@ class _QuizScreenState extends State<QuizScreen>
     return '${sentence.substring(0, index)}____'
         '${sentence.substring(index + word.length)}';
   }
-
-  // ---------- 交互 ----------
 
   void _choose(String option) {
     if (_selected != null) return;
@@ -151,14 +148,23 @@ class _QuizScreenState extends State<QuizScreen>
     });
   }
 
-  // ---------- 界面 ----------
-
   @override
   Widget build(BuildContext context) {
+    final p = context.pal;
+
     if (_items.isEmpty) {
       return Scaffold(
         appBar: AppBar(),
-        body: const Center(child: Text('没有可练习的词对')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Text(
+              '这些词对还没有能出题的例句。\n去词对详情里补一条包含该词的句子，就能练了。',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, height: 1.7, color: p.muted),
+            ),
+          ),
+        ),
       );
     }
 
@@ -171,7 +177,6 @@ class _QuizScreenState extends State<QuizScreen>
       );
     }
 
-    final scheme = Theme.of(context).colorScheme;
     final item = _items[_index];
     final answered = _selected != null;
     final isRight = _selected == item.answer;
@@ -185,10 +190,10 @@ class _QuizScreenState extends State<QuizScreen>
         ),
         title: Text(
           '第 ${_index + 1} / ${_items.length} 题',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF6B6A63),
+            color: p.muted,
           ),
         ),
         actions: [
@@ -200,7 +205,7 @@ class _QuizScreenState extends State<QuizScreen>
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: scheme.primary,
+                  color: p.primary,
                 ),
               ),
             ),
@@ -211,14 +216,14 @@ class _QuizScreenState extends State<QuizScreen>
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
                   value: progress,
                   minHeight: 5,
-                  backgroundColor: const Color(0xFFE8E5DD),
-                  valueColor: AlwaysStoppedAnimation<Color>(scheme.primary),
+                  backgroundColor: p.divider,
+                  valueColor: AlwaysStoppedAnimation<Color>(p.primary),
                 ),
               ),
             ),
@@ -226,29 +231,29 @@ class _QuizScreenState extends State<QuizScreen>
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
                 children: [
-                  const Text(
+                  Text(
                     '选词填空',
                     style: TextStyle(
                       fontSize: 11.5,
                       letterSpacing: 1.2,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF9A988F),
+                      color: p.hint,
                     ),
                   ),
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: p.card,
                       borderRadius: BorderRadius.circular(22),
                     ),
                     child: Text(
                       item.prompt,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 20,
                         height: 1.6,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF1C1B18),
+                        color: p.ink,
                       ),
                     ),
                   ),
@@ -272,7 +277,6 @@ class _QuizScreenState extends State<QuizScreen>
                               label: option,
                               state: _stateFor(option, item, answered),
                               onTap: answered ? null : () => _choose(option),
-                              scheme: scheme,
                             ),
                           ),
                       ],
@@ -284,11 +288,7 @@ class _QuizScreenState extends State<QuizScreen>
                         ? Padding(
                             key: ValueKey('feedback-$_index'),
                             padding: const EdgeInsets.only(top: 12),
-                            child: _FeedbackCard(
-                              isRight: isRight,
-                              item: item,
-                              scheme: scheme,
-                            ),
+                            child: _FeedbackCard(isRight: isRight, item: item),
                           )
                         : Padding(
                             key: const ValueKey('hint'),
@@ -299,7 +299,7 @@ class _QuizScreenState extends State<QuizScreen>
                               style: TextStyle(
                                 fontSize: 12,
                                 height: 1.6,
-                                color: const Color(0xFF9A988F),
+                                color: p.hint,
                               ),
                             ),
                           ),
@@ -317,7 +317,10 @@ class _QuizScreenState extends State<QuizScreen>
                   width: double.infinity,
                   child: FilledButton(
                     style: FilledButton.styleFrom(
-                      backgroundColor: scheme.primary,
+                      backgroundColor: p.primary,
+                      foregroundColor: context.isDark
+                          ? const Color(0xFF10231F)
+                          : Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
@@ -352,46 +355,41 @@ class _OptionButton extends StatelessWidget {
   final String label;
   final _OptionState state;
   final VoidCallback? onTap;
-  final ColorScheme scheme;
 
   const _OptionButton({
     required this.label,
     required this.state,
     required this.onTap,
-    required this.scheme,
   });
 
   @override
   Widget build(BuildContext context) {
-    const green = Color(0xFF2E7D4F);
-    const red = Color(0xFFC2453E);
+    final p = context.pal;
 
-    Color border;
-    Color fill;
-    Color text;
+    late final Color border;
+    late final Color fill;
+    late final Color text;
     IconData? icon;
 
     switch (state) {
       case _OptionState.idle:
-        border = const Color(0xFFE3E0D8);
-        fill = Colors.white;
-        text = const Color(0xFF1C1B18);
-        icon = null;
+        border = p.divider;
+        fill = p.card;
+        text = p.ink;
       case _OptionState.correct:
-        border = green;
-        fill = green.withValues(alpha: 0.08);
-        text = green;
+        border = p.success;
+        fill = p.success.withValues(alpha: 0.1);
+        text = p.success;
         icon = Icons.check_circle_rounded;
       case _OptionState.wrong:
-        border = red;
-        fill = red.withValues(alpha: 0.08);
-        text = red;
+        border = p.danger;
+        fill = p.danger.withValues(alpha: 0.1);
+        text = p.danger;
         icon = Icons.cancel_rounded;
       case _OptionState.dim:
-        border = const Color(0xFFEDEBE4);
-        fill = const Color(0xFFFAF9F5);
-        text = const Color(0xFFA8A69C);
-        icon = null;
+        border = p.divider.withValues(alpha: 0.6);
+        fill = p.chipBg.withValues(alpha: 0.5);
+        text = p.hint;
     }
 
     return AnimatedContainer(
@@ -434,26 +432,20 @@ class _OptionButton extends StatelessWidget {
 class _FeedbackCard extends StatelessWidget {
   final bool isRight;
   final QuizItem item;
-  final ColorScheme scheme;
 
-  const _FeedbackCard({
-    required this.isRight,
-    required this.item,
-    required this.scheme,
-  });
+  const _FeedbackCard({required this.isRight, required this.item});
 
   @override
   Widget build(BuildContext context) {
-    const green = Color(0xFF2E7D4F);
-    const red = Color(0xFFC2453E);
-    final color = isRight ? green : red;
+    final p = context.pal;
+    final color = isRight ? p.success : p.danger;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 15, 16, 16),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.06),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -476,23 +468,17 @@ class _FeedbackCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            item.gloss,
-            style: const TextStyle(
-              fontSize: 13,
-              height: 1.55,
-              color: Color(0xFF4A4941),
+          if (item.gloss.trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              item.gloss,
+              style: TextStyle(fontSize: 13, height: 1.55, color: p.muted),
             ),
-          ),
+          ],
           const SizedBox(height: 6),
           Text(
             item.note,
-            style: const TextStyle(
-              fontSize: 12,
-              height: 1.5,
-              color: Color(0xFF8E8C82),
-            ),
+            style: TextStyle(fontSize: 12, height: 1.5, color: p.hint),
           ),
           const SizedBox(height: 8),
           Text(
@@ -500,7 +486,7 @@ class _FeedbackCard extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               height: 1.5,
-              color: scheme.primary.withValues(alpha: 0.9),
+              color: p.primary.withValues(alpha: 0.9),
             ),
           ),
         ],
@@ -524,7 +510,7 @@ class _ResultView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final p = context.pal;
     final ratio = total == 0 ? 0.0 : correct / total;
     final message = ratio >= 0.9
         ? '这组已经很稳了'
@@ -541,21 +527,17 @@ class _ResultView extends StatelessWidget {
               const Spacer(),
               Text(
                 '$correct / $total',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 56,
                   height: 1.1,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF1C1B18),
+                  color: p.ink,
                 ),
               ),
               const SizedBox(height: 10),
               Text(
                 message,
-                style: const TextStyle(
-                  fontSize: 14,
-                  height: 1.6,
-                  color: Color(0xFF6B6A63),
-                ),
+                style: TextStyle(fontSize: 14, height: 1.6, color: p.muted),
               ),
               const SizedBox(height: 28),
               ClipRRect(
@@ -563,8 +545,8 @@ class _ResultView extends StatelessWidget {
                 child: LinearProgressIndicator(
                   value: ratio,
                   minHeight: 8,
-                  backgroundColor: const Color(0xFFE8E5DD),
-                  valueColor: AlwaysStoppedAnimation<Color>(scheme.primary),
+                  backgroundColor: p.divider,
+                  valueColor: AlwaysStoppedAnimation<Color>(p.primary),
                 ),
               ),
               const Spacer(),
@@ -573,7 +555,9 @@ class _ResultView extends StatelessWidget {
                 width: double.infinity,
                 child: FilledButton(
                   style: FilledButton.styleFrom(
-                    backgroundColor: scheme.primary,
+                    backgroundColor: p.primary,
+                    foregroundColor:
+                        context.isDark ? const Color(0xFF10231F) : Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -581,10 +565,7 @@ class _ResultView extends StatelessWidget {
                   onPressed: onRestart,
                   child: const Text(
                     '再来一遍',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
@@ -594,12 +575,12 @@ class _ResultView extends StatelessWidget {
                 width: double.infinity,
                 child: TextButton(
                   onPressed: onClose,
-                  child: const Text(
+                  child: Text(
                     '回到词对',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF6B6A63),
+                      color: p.muted,
                     ),
                   ),
                 ),
