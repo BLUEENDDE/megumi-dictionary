@@ -12,6 +12,7 @@ import 'detail_screen.dart';
 import 'learn_settings_screen.dart';
 import 'learned_list_screen.dart';
 import 'quiz_screen.dart';
+import 'word_quiz_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final List<WordPair> pairs;
@@ -40,8 +41,11 @@ class HomeScreenState extends State<HomeScreen> {
   String _query = '';
   List<DictEntry> _dictResults = const [];
 
-  /// 点过「新学」之后才展示词对。
+  /// 点过「新学」之后才展示列表。
   bool _showPairs = false;
+
+  /// 词典列表一次加载多少条。
+  int _limit = 50;
 
   ProgressStore get _progress => widget.progress;
   UserPairsStore get _userPairs => widget.userPairs;
@@ -75,28 +79,34 @@ class HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  List<WordPair> get _allPairs => [..._userPairs.pairs, ...widget.pairs];
+  // ---------- 词单 ----------
 
-  /// 当前选中的词单。
-  List<WordPair> get _activePairs => switch (SettingsStore.wordList.value) {
-        'builtin' => widget.pairs,
-        'user' => _userPairs.pairs,
-        _ => _allPairs,
+  String get _listId => SettingsStore.wordList.value;
+
+  int? get _level => switch (_listId) {
+        'beginner' => 0,
+        'intermediate' => 1,
+        'advanced' => 2,
+        _ => null,
       };
 
-  /// 从别的页面回来后刷新。
+  bool get _dictMode => _listId != 'user';
+
+  /// 词对来源：全部词对 = 自建；分级页只看官方词条。
+  List<WordPair> get _pairSource => _userPairs.pairs;
+
+  List<DictEntry> get _dictList => _dictMode
+      ? Dictionary.page(level: _level, offset: 0, limit: _limit)
+      : const [];
+
+  int get _dictTotal => _dictMode ? Dictionary.countOf(level: _level) : 0;
+
   void refresh() {
     if (mounted) setState(() {});
   }
 
-  /// 这一批要学的词对：数量就是设置里选的「每组词数」。
-  List<WordPair> get _studyBatch => _progress
-      .unlearned(_activePairs)
-      .take(SettingsStore.learnBatch.value)
-      .toList();
-
   List<WordPair> get _visiblePairs {
-    final base = _showPairs ? _studyBatch : _activePairs;
+    final base = _pairSource;
     if (_query.isEmpty) return base;
     final q = _query.toLowerCase();
     return base.where((pair) {
@@ -107,10 +117,80 @@ class HomeScreenState extends State<HomeScreen> {
     }).toList();
   }
 
+  // ---------- 单词（官方词单） ----------
+
+  List<DictEntry>? _levelCache;
+  String? _levelCacheKey;
+
+  List<DictEntry> _levelWords() {
+    if (!_dictMode) return const [];
+    if (_levelCache != null && _levelCacheKey == _listId) {
+      return _levelCache!;
+    }
+    _levelCache = Dictionary.allOf(level: _level);
+    _levelCacheKey = _listId;
+    return _levelCache!;
+  }
+
+  String _wid(String word) => 'w:$word';
+
+  List<DictEntry> _unlearnedWords(int count) {
+    final out = <DictEntry>[];
+    for (final entry in _levelWords()) {
+      if (_progress.statFor(_wid(entry.word)).learned) continue;
+      out.add(entry);
+      if (out.length >= count) break;
+    }
+    return out;
+  }
+
+  List<DictEntry> _dueWords() {
+    final out = <DictEntry>[];
+    for (final entry in _levelWords()) {
+      if (_progress.statFor(_wid(entry.word)).isDue) out.add(entry);
+    }
+    return out;
+  }
+
+  int _learnedWords() => _levelWords()
+      .where((e) => _progress.statFor(_wid(e.word)).learned)
+      .length;
+
+  int _masteredWords() => _levelWords()
+      .where((e) => _progress.isMastered(_wid(e.word)))
+      .length;
+
+  Future<void> _runWordQuiz(String title, List<DictEntry> words) async {
+    await Navigator.of(context).push(
+      fadeUpRoute(
+        WordQuizScreen(
+          title: title,
+          words: words,
+          pool: _levelWords(),
+          store: _progress,
+        ),
+      ),
+    );
+    if (mounted) setState(() {});
+  }
+
+  // ---------- 动作 ----------
+
   Future<void> _startReview() async {
-    final queue = _progress.dueQueue(_activePairs);
+    if (_dictMode) {
+      final due = _dueWords();
+      if (due.isEmpty) {
+        _toast('这一册还没有到期的单词');
+        return;
+      }
+      final batch = due.take(SettingsStore.learnBatch.value).toList();
+      await _runWordQuiz(_listName, batch);
+      return;
+    }
+
+    final queue = _progress.dueQueue(_pairSource);
     if (queue.isEmpty) {
-      _toast('今天没有到期的词对，点「新学」看看新的');
+      _toast('这一单还没有到期的词对');
       return;
     }
     await Navigator.of(context).push(
@@ -120,22 +200,25 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void _startLearn() {
-    setState(() => _showPairs = true);
+    if (!_dictMode) {
+      setState(() => _showPairs = true);
+      return;
+    }
+    final words = _unlearnedWords(SettingsStore.learnBatch.value);
+    if (words.isEmpty) {
+      _toast('这一册都学完了');
+      return;
+    }
+    _runWordQuiz(_listName, words);
   }
+
+  String get _listName =>
+      SettingsStore.listOptions[_listId] ?? '初级';
 
   void _toast(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  Future<void> _openDetail(WordPair pair) async {
-    await Navigator.of(context).push(
-      fadeUpRoute(
-        DetailScreen(pair: pair, store: _progress, userPairs: _userPairs),
-      ),
-    );
-    if (mounted) setState(() {});
   }
 
   Future<void> _pickWordList() async {
@@ -181,6 +264,19 @@ class HomeScreenState extends State<HomeScreen> {
     );
     if (picked == null) return;
     await SettingsStore().setWordList(picked);
+    if (!mounted) return;
+    setState(() {
+      _showPairs = false;
+      _limit = 50;
+    });
+  }
+
+  Future<void> _openDetail(WordPair pair) async {
+    await Navigator.of(context).push(
+      fadeUpRoute(
+        DetailScreen(pair: pair, store: _progress, userPairs: _userPairs),
+      ),
+    );
     if (mounted) setState(() {});
   }
 
@@ -188,7 +284,7 @@ class HomeScreenState extends State<HomeScreen> {
     await Navigator.of(context).push(
       fadeUpRoute(
         LearnedListScreen(
-          pairs: _allPairs,
+          pairs: _pairSource,
           store: _progress,
           userPairs: _userPairs,
         ),
@@ -198,9 +294,7 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openLearnSettings() async {
-    await Navigator.of(context).push(
-      fadeUpRoute(const LearnSettingsScreen()),
-    );
+    await Navigator.of(context).push(fadeUpRoute(const LearnSettingsScreen()));
     if (mounted) setState(() {});
   }
 
@@ -235,10 +329,18 @@ class HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final p = context.pal;
     final visible = _visiblePairs;
-    final due = _progress.dueCount(_activePairs);
-    final toLearn = _progress.unlearned(_activePairs).length;
-    final learned = _progress.learnedPairs(_activePairs).length;
-    final mastered = _progress.masteredPairs(_activePairs).length;
+    final learned = _dictMode
+        ? _learnedWords()
+        : _progress.learnedPairs(_pairSource).length;
+    final mastered = _dictMode
+        ? _masteredWords()
+        : _progress.masteredPairs(_pairSource).length;
+    final due = _dictMode ? _dueWords().length : _progress.dueCount(_pairSource);
+    final toLearn =
+        _dictMode ? (_dictTotal - learned) : _progress.unlearned(_pairSource).length;
+    final total = _dictMode ? _dictTotal : _pairSource.length;
+    final dictItems =
+        _showPairs && _query.isEmpty ? _dictList : const <DictEntry>[];
 
     return Scaffold(
       body: SafeArea(
@@ -279,14 +381,15 @@ class HomeScreenState extends State<HomeScreen> {
                     due: due,
                     learned: learned,
                     mastered: mastered,
-                    total: _activePairs.length,
-                    listName: SettingsStore.listOptions[SettingsStore.wordList.value] ?? '全部词对',
-                    onPickList: _pickWordList,
+                    total: total,
+                    unit: _dictMode ? '词' : '组',
                     unlearned: toLearn,
+                    listName: SettingsStore.listOptions[_listId] ?? '全部词对',
                     onReview: _startReview,
                     onLearn: _startLearn,
                     onSettings: _openLearnSettings,
                     onLearned: _openLearnedList,
+                    onPickList: _pickWordList,
                   ),
                   _ProgressCard(
                     mastered: mastered,
@@ -352,7 +455,7 @@ class HomeScreenState extends State<HomeScreen> {
               Row(
                 children: [
                   Text(
-                    '词对',
+                    _dictMode ? '词条' : '词对',
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
@@ -361,13 +464,15 @@ class HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '${visible.length} 组',
+                    _dictMode
+                        ? '${dictItems.length} / $_dictTotal'
+                        : '${visible.length} 组',
                     style: TextStyle(fontSize: 13, color: p.muted),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
-              if (visible.isEmpty)
+              if (!_dictMode && visible.isEmpty)
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 34),
                   alignment: Alignment.center,
@@ -376,7 +481,7 @@ class HomeScreenState extends State<HomeScreen> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    '这一批都学完了',
+                    '自建词库还是空的',
                     style: TextStyle(fontSize: 13, color: p.hint),
                   ),
                 ),
@@ -389,6 +494,27 @@ class HomeScreenState extends State<HomeScreen> {
                     onTap: () => _openDetail(pair),
                     onLongPress:
                         pair.isUserMade ? () => _deletePair(pair) : null,
+                  ),
+                ),
+              for (final entry in dictItems)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _DictTile(
+                    entry: entry,
+                    onTap: () => showDictEntrySheet(context, entry),
+                  ),
+                ),
+              if (_dictMode && dictItems.length < _dictTotal)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Center(
+                    child: TextButton(
+                      onPressed: () => setState(() => _limit += 50),
+                      child: Text(
+                        '加载更多',
+                        style: TextStyle(fontSize: 13, color: p.primary),
+                      ),
+                    ),
                   ),
                 ),
             ],
@@ -405,6 +531,7 @@ class _SummaryCard extends StatelessWidget {
   final int learned;
   final int mastered;
   final int total;
+  final String unit;
   final int unlearned;
   final String listName;
   final VoidCallback onReview;
@@ -418,6 +545,7 @@ class _SummaryCard extends StatelessWidget {
     required this.learned,
     required this.mastered,
     required this.total,
+    required this.unit,
     required this.unlearned,
     required this.listName,
     required this.onReview,
@@ -469,7 +597,7 @@ class _SummaryCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '共 $total 组',
+                      '共 $total $unit',
                       style: TextStyle(fontSize: 12.5, color: p.muted),
                     ),
                     const SizedBox(height: 8),
@@ -513,7 +641,7 @@ class _SummaryCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
@@ -552,7 +680,7 @@ class _SummaryCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
@@ -753,7 +881,6 @@ class _DotStat extends StatelessWidget {
   }
 }
 
-/// 第二张卡：掌握 / 新学 / 自建。
 class _ProgressCard extends StatelessWidget {
   final int mastered;
   final int fresh;
@@ -897,9 +1024,22 @@ class _DictTile extends StatelessWidget {
 
   const _DictTile({required this.entry, required this.onTap});
 
+  Color _levelColor(Palette p) => switch (entry.level) {
+        0 => p.success,
+        1 => p.primary,
+        _ => p.hint,
+      };
+
+  String get _levelName => switch (entry.level) {
+        0 => '初',
+        1 => '中',
+        _ => '高',
+      };
+
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
+    final levelColor = _levelColor(p);
 
     return Material(
       color: p.card,
@@ -914,6 +1054,24 @@ class _DictTile extends StatelessWidget {
             children: [
               Row(
                 children: [
+                  Container(
+                    width: 18,
+                    height: 18,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: levelColor.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: Text(
+                      _levelName,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: levelColor,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       entry.word,

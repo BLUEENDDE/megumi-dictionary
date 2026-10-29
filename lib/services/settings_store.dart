@@ -21,12 +21,13 @@ class SettingsStore {
 
   /// 词单：all / builtin / user。
   static const listOptions = <String, String>{
-    'all': '全部词对',
-    'builtin': '内置示例',
-    'user': '自建词对',
+    'beginner': '初级',
+    'intermediate': '中级',
+    'advanced': '高级',
+    'user': '自建词库',
   };
 
-  static final ValueNotifier<String> wordList = ValueNotifier<String>('all');
+  static final ValueNotifier<String> wordList = ValueNotifier<String>('beginner');
 
   /// 上次导出备份的时间（毫秒），null 表示从未备份过。
   static final ValueNotifier<int?> lastBackupAt = ValueNotifier<int?>(null);
@@ -46,7 +47,7 @@ class SettingsStore {
     lastBackupAt.value = prefs.getInt(_backupKey);
 
     final list = prefs.getString(_listKey);
-    wordList.value = listOptions.containsKey(list) ? list! : 'all';
+    wordList.value = listOptions.containsKey(list) ? list! : 'beginner';
   }
 
   Future<void> markBackedUp() async {

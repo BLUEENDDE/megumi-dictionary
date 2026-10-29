@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'data/sample_data.dart';
 import 'screens/root_shell.dart';
 import 'services/settings_store.dart';
 import 'theme/palette.dart';
@@ -25,7 +24,7 @@ class VocabApp extends StatelessWidget {
           theme: buildTheme(Palette.light, Brightness.light),
           darkTheme: buildTheme(Palette.dark, Brightness.dark),
           themeMode: mode,
-          home: const RootShell(pairs: samplePairs),
+          home: const RootShell(pairs: []),
         );
       },
     );

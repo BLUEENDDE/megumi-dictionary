@@ -7,10 +7,14 @@ class DictEntry {
   final String gloss;
   final int page;
 
+  /// 0 初级 / 1 中级 / 2 高级
+  final int level;
+
   const DictEntry({
     required this.word,
     required this.gloss,
     required this.page,
+    this.level = 2,
   });
 }
 
@@ -33,6 +37,7 @@ class Dictionary {
           word: (map['w'] as String? ?? '').trim(),
           gloss: (map['g'] as String? ?? '').trim(),
           page: (map['p'] as num?)?.toInt() ?? 0,
+          level: (map['lvl'] as num?)?.toInt() ?? 2,
         );
       }).where((e) => e.word.isNotEmpty).toList();
     } catch (_) {
@@ -59,6 +64,25 @@ class Dictionary {
     }
 
     return [...prefix, ...contains].take(limit).toList();
+  }
+
+  static List<DictEntry> allOf({int? level}) => level == null
+      ? _entries
+      : _entries.where((e) => e.level == level).toList();
+
+  static int countOf({int? level}) => level == null
+      ? _entries.length
+      : _entries.where((e) => e.level == level).length;
+
+  static List<DictEntry> page({
+    int? level,
+    required int offset,
+    int limit = 50,
+  }) {
+    final src = level == null
+        ? _entries
+        : _entries.where((e) => e.level == level);
+    return src.skip(offset).take(limit).toList();
   }
 
   /// 随便取几条，用于空状态展示。

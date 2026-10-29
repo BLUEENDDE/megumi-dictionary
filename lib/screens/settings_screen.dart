@@ -154,7 +154,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '把之前导出的那段文字粘进来。会合并自建词对，同名的以导入为准。',
+                  '把之前导出的那段文字粘进来。会合并自建词库，同名的以导入为准。',
                   style: TextStyle(fontSize: 12.5, height: 1.6, color: p.muted),
                 ),
                 const SizedBox(height: 12),
@@ -194,7 +194,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final data = BackupService.decode(raw.trim());
 
-      // 自建词对：按 id 合并，导入的覆盖同 id 的
+      // 自建词库：按 id 合并，导入的覆盖同 id 的
       final merged = <String, WordPair>{
         for (final pair in widget.userPairs.pairs) pair.id: pair,
       };
@@ -232,7 +232,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('清空学习进度？'),
-        content: const Text('自建词对会保留，但练习记录和正确率会全部清零。'),
+        content: const Text('自建词库会保留，但练习记录和正确率会全部清零。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -380,11 +380,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 _InfoRow(label: '名称', value: 'megumi辞書'),
                 const SizedBox(height: 10),
-                _InfoRow(label: '自建词对', value: '${widget.userPairs.pairs.length} 组'),
+                _InfoRow(label: '自建词库', value: '${widget.userPairs.pairs.length} 组'),
                 const SizedBox(height: 10),
                 _InfoRow(label: '已掌握', value: '${widget.progress.trainedPairs} 组'),
                 const SizedBox(height: 10),
-                _InfoRow(label: '版本', value: '2.3.0'),
+                _InfoRow(label: '版本', value: '2.4.0'),
               ],
             ),
           ),
