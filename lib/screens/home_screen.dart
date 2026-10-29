@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../models/word_pair.dart';
 import '../services/progress_store.dart';
@@ -193,7 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onChanged: (value) => setState(() => _query = value.trim()),
               ),
             ],
-            const SizedBox(height: 22),
+            const SizedBox(height: 24),
             Row(
               children: [
                 Text(

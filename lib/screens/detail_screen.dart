@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../models/word_family.dart';
 import '../models/word_pair.dart';
+import '../services/family_index.dart';
 import '../services/progress_store.dart';
 import '../services/user_pairs_store.dart';
 import '../theme/palette.dart';
 import '../widgets/ui_kit.dart';
 import 'add_pair_screen.dart';
+import 'family_screen.dart';
 import 'quiz_screen.dart';
 
 class DetailScreen extends StatefulWidget {
@@ -67,7 +70,14 @@ class _DetailScreenState extends State<DetailScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
         children: [
-          _Header(pair: _pair),
+          _Header(
+            pair: _pair,
+            onOpenFamily: (family) {
+              Navigator.of(context).push(
+                fadeUpRoute(FamilyScreen(family: family)),
+              );
+            },
+          ),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(14),
@@ -189,15 +199,16 @@ class _DetailScreenState extends State<DetailScreen> {
 
 class _Header extends StatelessWidget {
   final WordPair pair;
+  final void Function(WordFamily family) onOpenFamily;
 
-  const _Header({required this.pair});
+  const _Header({required this.pair, required this.onOpenFamily});
 
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(18, 22, 18, 22),
+      padding: const EdgeInsets.fromLTRB(18, 22, 18, 18),
       decoration: BoxDecoration(
         color: p.card,
         borderRadius: BorderRadius.circular(22),
@@ -205,7 +216,13 @@ class _Header extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(child: _Side(sense: pair.first)),
+          Expanded(
+            child: _Side(
+              sense: pair.first,
+              family: familyForWord(pair.first.form),
+              onOpenFamily: onOpenFamily,
+            ),
+          ),
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 10),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
@@ -223,7 +240,13 @@ class _Header extends StatelessWidget {
               ),
             ),
           ),
-          Expanded(child: _Side(sense: pair.second)),
+          Expanded(
+            child: _Side(
+              sense: pair.second,
+              family: familyForWord(pair.second.form),
+              onOpenFamily: onOpenFamily,
+            ),
+          ),
         ],
       ),
     );
@@ -232,23 +255,46 @@ class _Header extends StatelessWidget {
 
 class _Side extends StatelessWidget {
   final WordSense sense;
+  final WordFamily? family;
+  final void Function(WordFamily family) onOpenFamily;
 
-  const _Side({required this.sense});
+  const _Side({
+    required this.sense,
+    required this.family,
+    required this.onOpenFamily,
+  });
 
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
+    final family = this.family;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          sense.form,
-          style: TextStyle(
-            fontSize: 24,
-            height: 1.2,
-            fontWeight: FontWeight.w800,
-            color: p.ink,
-          ),
+        Row(
+          children: [
+            Flexible(
+              child: Text(
+                sense.form,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 24,
+                  height: 1.2,
+                  fontWeight: FontWeight.w800,
+                  color: p.ink,
+                ),
+              ),
+            ),
+            if (family != null) ...[
+              const SizedBox(width: 8),
+              _FamilyButton(
+                family: family,
+                onTap: () => onOpenFamily(family),
+              ),
+            ],
+          ],
         ),
         const SizedBox(height: 8),
         Text(
@@ -256,6 +302,48 @@ class _Side extends StatelessWidget {
           style: TextStyle(fontSize: 12.5, height: 1.5, color: p.muted),
         ),
       ],
+    );
+  }
+}
+
+class _FamilyButton extends StatelessWidget {
+  final WordFamily family;
+  final VoidCallback onTap;
+
+  const _FamilyButton({required this.family, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+
+    return Tooltip(
+      message: '关系网：${family.members.length} 个派生词',
+      child: Material(
+        color: p.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(9),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(9),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.hub_outlined, size: 14, color: p.primary),
+                const SizedBox(width: 3),
+                Text(
+                  '${family.members.length}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: p.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -4,8 +4,10 @@
 import 'package:flutter/material.dart';
 
 import 'data/sample_data.dart';
+import 'data/word_families.dart';
 import 'screens/add_pair_screen.dart';
 import 'screens/detail_screen.dart';
+import 'screens/family_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/quiz_screen.dart';
 import 'screens/settings_screen.dart';
@@ -40,6 +42,7 @@ class PreviewApp extends StatelessWidget {
       'quiz-right' => QuizScreen(pairs: samplePairs, previewAnswer: 'right'),
       'quiz-wrong' => QuizScreen(pairs: samplePairs, previewAnswer: 'wrong'),
       'add' => const AddPairScreen(),
+      'family' => FamilyScreen(family: wordFamilies.first),
       'settings' => SettingsScreen(progress: progress, userPairs: userPairs),
       _ => const HomeScreen(pairs: samplePairs),
     };
