@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/affix_glossary.dart';
 import '../models/word_family.dart';
 import '../theme/palette.dart';
 
@@ -34,6 +35,10 @@ class _FamilyScreenState extends State<FamilyScreen> {
   Widget build(BuildContext context) {
     final p = context.pal;
     final family = widget.family;
+
+    // 同源词按词缀排序，相同词缀挨在一起，方便对比
+    final members = [...family.members]
+      ..sort((a, b) => a.affix.compareTo(b.affix));
 
     return Scaffold(
       appBar: AppBar(
@@ -104,7 +109,7 @@ class _FamilyScreenState extends State<FamilyScreen> {
           Row(
             children: [
               Text(
-                '派生词',
+                '同源词',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
@@ -119,7 +124,7 @@ class _FamilyScreenState extends State<FamilyScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          for (var i = 0; i < family.members.length; i++)
+          for (var i = 0; i < members.length; i++)
             IntrinsicHeight(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -129,9 +134,9 @@ class _FamilyScreenState extends State<FamilyScreen> {
                     child: CustomPaint(
                       painter: _BranchPainter(
                         first: i == 0,
-                        last: i == family.members.length - 1,
+                        last: i == members.length - 1,
                         lineColor: p.divider,
-                        dotColor: _affixColor(family.members[i].affix, p),
+                        dotColor: _affixColor(members[i].affix, p),
                       ),
                     ),
                   ),
@@ -139,8 +144,8 @@ class _FamilyScreenState extends State<FamilyScreen> {
                     child: Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: _MemberCard(
-                        member: family.members[i],
-                        color: _affixColor(family.members[i].affix, p),
+                        member: members[i],
+                        color: _affixColor(members[i].affix, p),
                         expanded: _expanded == i,
                         onTap: () => setState(
                           () => _expanded = _expanded == i ? null : i,
@@ -285,11 +290,13 @@ class _MemberCard extends StatelessWidget {
                   member.gloss,
                   style: TextStyle(fontSize: 12.5, height: 1.5, color: p.muted),
                 ),
-                if (expanded)
+                if (expanded && (member.note.isNotEmpty || affixHint(member.affix).isNotEmpty))
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
-                      member.note,
+                      member.note.isNotEmpty
+                          ? member.note
+                          : affixHint(member.affix),
                       style: TextStyle(
                         fontSize: 11.5,
                         height: 1.6,
