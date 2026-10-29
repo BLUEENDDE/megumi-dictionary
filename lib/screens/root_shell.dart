@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/dictionary.dart';
+import '../services/family_store.dart';
 import '../services/progress_store.dart';
 import '../services/user_pairs_store.dart';
 import '../theme/palette.dart';
@@ -32,7 +33,12 @@ class _RootShellState extends State<RootShell> {
   }
 
   Future<void> _init() async {
-    await Future.wait([_progress.load(), _userPairs.load(), Dictionary.load()]);
+    await Future.wait([
+      _progress.load(),
+      _userPairs.load(),
+      Dictionary.load(),
+    ]);
+    await FamilyStore.load();
     if (mounted) setState(() => _ready = true);
   }
 

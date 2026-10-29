@@ -27,6 +27,12 @@ class SettingsStore {
     'user': '自建词库',
   };
 
+  /// 词单分类：基础词库（官方三册）+ 自建词库（以后）
+  static const categories = <String, List<String>>{
+    '基础词库': ['beginner', 'intermediate', 'advanced'],
+    '自建词库': ['user'],
+  };
+
   static final ValueNotifier<String> wordList = ValueNotifier<String>('beginner');
 
   /// 上次导出备份的时间（毫秒），null 表示从未备份过。

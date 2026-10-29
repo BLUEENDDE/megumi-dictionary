@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/dictionary.dart';
-import '../services/family_index.dart';
+import '../services/family_store.dart';
 import '../services/progress_store.dart';
 import '../services/settings_store.dart';
 import '../theme/palette.dart';
@@ -45,7 +45,7 @@ class HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    Dictionary.load().then((_) {
+    Future.wait([Dictionary.load(), FamilyStore.load()]).then((_) {
       if (!mounted) return;
       final initial = widget.initialQuery;
       if (initial != null && initial.isNotEmpty) {
@@ -95,6 +95,7 @@ class HomeScreenState extends State<HomeScreen> {
   String get _listName => SettingsStore.listOptions[_listId] ?? '初级';
 
   List<DictEntry> get _levelWords {
+    if (_listId == 'user') return const [];
     if (_levelCache != null && _levelCacheKey == _listId) return _levelCache!;
     _levelCache = Dictionary.allOf(level: _level);
     _levelCacheKey = _listId;
@@ -201,17 +202,43 @@ class HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 10),
-              for (final entry in SettingsStore.listOptions.entries)
-                ListTile(
-                  title: Text(
-                    entry.value,
-                    style: TextStyle(fontSize: 14.5, color: bp.ink),
+              for (final category in SettingsStore.categories.entries) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      category.key,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        letterSpacing: 1,
+                        fontWeight: FontWeight.w700,
+                        color: bp.hint,
+                      ),
+                    ),
                   ),
-                  trailing: _listId == entry.key
-                      ? Icon(Icons.check_rounded, size: 18, color: bp.primary)
-                      : null,
-                  onTap: () => Navigator.of(context).pop(entry.key),
                 ),
+                for (final id in category.value)
+                  ListTile(
+                    leading: _BookThumb(
+                      width: 26,
+                      height: 34,
+                      muted: id == 'user',
+                    ),
+                    title: Text(
+                      SettingsStore.listOptions[id] ?? id,
+                      style: TextStyle(fontSize: 14.5, color: bp.ink),
+                    ),
+                    subtitle: Text(
+                      _subtitleFor(id),
+                      style: TextStyle(fontSize: 11.5, color: bp.hint),
+                    ),
+                    trailing: _listId == id
+                        ? Icon(Icons.check_rounded, size: 18, color: bp.primary)
+                        : null,
+                    onTap: () => Navigator.of(context).pop(id),
+                  ),
+              ],
               const SizedBox(height: 8),
             ],
           ),
@@ -228,13 +255,24 @@ class HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  String _subtitleFor(String id) {
+    final level = switch (id) {
+      'beginner' => 0,
+      'intermediate' => 1,
+      'advanced' => 2,
+      _ => null,
+    };
+    if (level == null) return '以后放你自建的词库';
+    return '${Dictionary.countOf(level: level)} 词';
+  }
+
   Future<void> _openLearnSettings() async {
     await Navigator.of(context).push(fadeUpRoute(const LearnSettingsScreen()));
     if (mounted) setState(_recount);
   }
 
   void _openFamily(String word) {
-    final family = familyForWord(word);
+    final family = FamilyStore.familyOf(word);
     if (family == null) {
       _toast('「$word」还没有词族');
       return;
@@ -888,7 +926,7 @@ class _WordTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.pal;
     final levelColor = _levelColor(p);
-    final hasFamily = familyForWord(entry.word) != null;
+    final hasFamily = FamilyStore.familyOf(entry.word) != null;
 
     return Material(
       color: p.card,
@@ -984,6 +1022,49 @@ class _FamilyButton extends StatelessWidget {
               size: 17,
               color: active ? p.primary : p.hint,
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 词单里的小书封。
+class _BookThumb extends StatelessWidget {
+  final double width;
+  final double height;
+  final bool muted;
+
+  const _BookThumb({
+    required this.width,
+    required this.height,
+    this.muted = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: muted
+              ? const [Color(0xFFB9AEB4), Color(0xFF8C8189)]
+              : const [Color(0xFF7A2E45), Color(0xFF3A1E2B)],
+        ),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Center(
+        child: Text(
+          'M',
+          style: TextStyle(
+            fontSize: height * 0.42,
+            height: 1,
+            fontWeight: FontWeight.w700,
+            color: const Color(0xFFFDF0F3),
+            fontFamily: 'serif',
           ),
         ),
       ),
