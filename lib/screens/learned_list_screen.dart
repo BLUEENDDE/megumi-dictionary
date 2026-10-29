@@ -43,6 +43,7 @@ class _LearnedListScreenState extends State<LearnedListScreen> {
     final p = context.pal;
     final learning = widget.store.learningPairs(widget.pairs);
     final mastered = widget.store.masteredPairs(widget.pairs);
+    final fresh = widget.store.unlearned(widget.pairs);
 
     return Scaffold(
       appBar: AppBar(
@@ -55,9 +56,13 @@ class _LearnedListScreenState extends State<LearnedListScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
         children: [
-          _Summary(learning: learning.length, mastered: mastered.length),
+          _Summary(
+            learning: learning.length,
+            mastered: mastered.length,
+            fresh: fresh.length,
+          ),
           const SizedBox(height: 20),
-          if (learning.isEmpty && mastered.isEmpty)
+          if (learning.isEmpty && mastered.isEmpty && fresh.isEmpty)
             Container(
               padding: const EdgeInsets.symmetric(vertical: 40),
               alignment: Alignment.center,
@@ -97,6 +102,21 @@ class _LearnedListScreenState extends State<LearnedListScreen> {
                   onTap: () => _open(pair),
                 ),
               ),
+            const SizedBox(height: 14),
+          ],
+          if (fresh.isNotEmpty) ...[
+            _SectionTitle('新学', fresh.length),
+            const SizedBox(height: 10),
+            for (final pair in fresh)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _Row(
+                  pair: pair,
+                  stat: widget.store.statFor(pair.id),
+                  fresh: true,
+                  onTap: () => _open(pair),
+                ),
+              ),
           ],
         ],
       ),
@@ -107,14 +127,19 @@ class _LearnedListScreenState extends State<LearnedListScreen> {
 class _Summary extends StatelessWidget {
   final int learning;
   final int mastered;
+  final int fresh;
 
-  const _Summary({required this.learning, required this.mastered});
+  const _Summary({
+    required this.learning,
+    required this.mastered,
+    required this.fresh,
+  });
 
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
     return Container(
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
       decoration: BoxDecoration(
         color: p.card,
         borderRadius: BorderRadius.circular(18),
@@ -135,6 +160,10 @@ class _Summary extends StatelessWidget {
               value: '$mastered',
               color: p.success,
             ),
+          ),
+          Container(width: 1, height: 30, color: p.divider),
+          Expanded(
+            child: _Metric(label: '新学', value: '$fresh', color: p.hint),
           ),
         ],
       ),
@@ -203,6 +232,7 @@ class _Row extends StatelessWidget {
   final WordPair pair;
   final PairStat stat;
   final bool mastered;
+  final bool fresh;
   final VoidCallback onTap;
 
   const _Row({
@@ -210,6 +240,7 @@ class _Row extends StatelessWidget {
     required this.stat,
     required this.onTap,
     this.mastered = false,
+    this.fresh = false,
   });
 
   @override
@@ -269,12 +300,16 @@ class _Row extends StatelessWidget {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        _BoxBar(box: stat.box, mastered: mastered),
-                        const SizedBox(width: 10),
+                        if (!fresh) ...[
+                          _BoxBar(box: stat.box, mastered: mastered),
+                          const SizedBox(width: 10),
+                        ],
                         Text(
-                          mastered
-                              ? '复习完成'
-                              : '记忆 ${stat.box}/${ProgressStore.maxBox}',
+                          fresh
+                              ? '还没学过'
+                              : mastered
+                                  ? '复习完成'
+                                  : '记忆 ${stat.box}/${ProgressStore.maxBox}',
                           style: TextStyle(fontSize: 11, color: p.hint),
                         ),
                       ],
@@ -284,7 +319,7 @@ class _Row extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                '${stat.accuracyPercent}%',
+                fresh ? '—' : '${stat.accuracyPercent}%',
                 style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w700,

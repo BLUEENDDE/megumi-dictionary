@@ -12,6 +12,7 @@ import 'screens/home_screen.dart';
 import 'screens/learn_session_screen.dart';
 import 'screens/learned_list_screen.dart';
 import 'screens/quiz_screen.dart';
+import 'screens/root_shell.dart';
 import 'screens/settings_screen.dart';
 import 'services/progress_store.dart';
 import 'services/user_pairs_store.dart';
@@ -55,7 +56,13 @@ class PreviewApp extends StatelessWidget {
           store: progress,
         ),
       'settings' => SettingsScreen(progress: progress, userPairs: userPairs),
-      _ => const HomeScreen(pairs: samplePairs),
+      _ => screen == 'shell'
+          ? const RootShell(pairs: samplePairs)
+          : HomeScreen(
+              pairs: samplePairs,
+              progress: progress,
+              userPairs: userPairs,
+            ),
     };
 
     return MaterialApp(

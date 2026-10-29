@@ -12,10 +12,14 @@ class SettingsScreen extends StatefulWidget {
   final ProgressStore progress;
   final UserPairsStore userPairs;
 
+  /// 作为底部页签嵌入时为 true：不显示返回键。
+  final bool embedded;
+
   const SettingsScreen({
     super.key,
     required this.progress,
     required this.userPairs,
+    this.embedded = false,
   });
 
   @override
@@ -213,10 +217,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.of(context).maybePop(),
-        ),
+        automaticallyImplyLeading: !widget.embedded,
+        leading: widget.embedded
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                onPressed: () => Navigator.of(context).maybePop(),
+              ),
         title: const Text('设置'),
       ),
       body: ListView(

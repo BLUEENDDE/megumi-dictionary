@@ -11,32 +11,33 @@ import 'detail_screen.dart';
 import 'learn_session_screen.dart';
 import 'learned_list_screen.dart';
 import 'quiz_screen.dart';
-import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final List<WordPair> pairs;
+  final ProgressStore progress;
+  final UserPairsStore userPairs;
 
-  const HomeScreen({super.key, required this.pairs});
+  const HomeScreen({
+    super.key,
+    required this.pairs,
+    required this.progress,
+    required this.userPairs,
+  });
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<HomeScreen> createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  final ProgressStore _progress = ProgressStore();
-  final UserPairsStore _userPairs = UserPairsStore();
+class HomeScreenState extends State<HomeScreen> {
   final TextEditingController _search = TextEditingController();
 
   String _query = '';
 
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
+  ProgressStore get _progress => widget.progress;
+  UserPairsStore get _userPairs => widget.userPairs;
 
-  Future<void> _load() async {
-    await Future.wait([_progress.load(), _userPairs.load()]);
+  /// 从别的页面回来后刷新（进度可能变了）。
+  void refresh() {
     if (mounted) setState(() {});
   }
 
@@ -206,22 +207,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                 ),
-                IconButton(
-                  onPressed: () async {
-                    await Navigator.of(context).push(
-                      fadeUpRoute(
-                        SettingsScreen(
-                          progress: _progress,
-                          userPairs: _userPairs,
-                        ),
-                      ),
-                    );
-                    await _load();
-                  },
-                  icon: const Icon(Icons.settings_outlined, size: 21),
-                  color: p.muted,
-                  tooltip: '设置',
-                ),
               ],
             ),
             const SizedBox(height: 6),
@@ -247,6 +232,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _LearnedEntry(
               learned: learned,
               mastered: mastered,
+              fresh: toLearn,
               onTap: _openLearnedList,
             ),
             if (_allPairs.length > 4) ...[
@@ -479,11 +465,13 @@ class _BatchChip extends StatelessWidget {
 class _LearnedEntry extends StatelessWidget {
   final int learned;
   final int mastered;
+  final int fresh;
   final VoidCallback onTap;
 
   const _LearnedEntry({
     required this.learned,
     required this.mastered,
+    required this.fresh,
     required this.onTap,
   });
 
@@ -511,10 +499,15 @@ class _LearnedEntry extends StatelessWidget {
                   color: p.ink,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Text(
                 '· 掌握 $mastered',
                 style: TextStyle(fontSize: 12, color: p.success),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '· 新学 $fresh',
+                style: TextStyle(fontSize: 12, color: p.hint),
               ),
               const Spacer(),
               Icon(
