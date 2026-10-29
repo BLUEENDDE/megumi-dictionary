@@ -1,4 +1,4 @@
-// 仅用于截图/预览的入口，不参与正式打包。
+﻿// 仅用于截图/预览的入口，不参与正式打包。
 // 用法：flutter build web -t lib/preview_main.dart
 // 打开 index.html?screen=detail&theme=dark 之类。
 import 'package:flutter/material.dart';
@@ -7,6 +7,7 @@ import 'data/sample_data.dart';
 import 'data/word_families.dart';
 import 'screens/add_pair_screen.dart';
 import 'screens/detail_screen.dart';
+import 'screens/dictionary_screen.dart';
 import 'screens/family_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/learn_session_screen.dart';
@@ -58,6 +59,7 @@ class PreviewApp extends StatelessWidget {
         ),
       'settings' => SettingsScreen(progress: progress, userPairs: userPairs),
       'import' => TextImportScreen(userPairs: userPairs),
+      'dict' => DictionaryScreen(initialQuery: params['q']),
       _ => screen == 'shell'
           ? const RootShell(pairs: samplePairs)
           : HomeScreen(
@@ -86,3 +88,4 @@ class PreviewApp extends StatelessWidget {
     );
   }
 }
+
