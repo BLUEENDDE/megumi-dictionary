@@ -41,7 +41,7 @@ ImportParseResult parseWordList(String raw) {
     if (line.isEmpty || line.startsWith('#')) continue;
 
     final parts = _split(line);
-    if (parts.length != 2 && parts.length < 4) {
+    if (parts.length < 2 || parts.length == 3) {
       errors.add(
         '第 ${i + 1} 行：写成「词 | 释义」，或「词A | 释义A | 词B | 释义B」',
       );

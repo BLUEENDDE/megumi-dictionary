@@ -102,7 +102,7 @@ class HomeScreenState extends State<HomeScreen> {
     return [
       ...mine,
       ...Dictionary.search(q, limit: 30),
-    ].where((e) => seen.add(e.word)).take(30).toList();
+    ].where((e) => seen.add(e.word.toLowerCase())).take(30).toList();
   }
 
   String get _listId => SettingsStore.wordList.value;

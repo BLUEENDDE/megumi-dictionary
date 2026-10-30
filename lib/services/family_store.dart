@@ -88,10 +88,11 @@ class FamilyStore {
     final curated = familyForWord(word);
     if (curated != null) return curated;
 
-    final root = _rootOf[word] ?? _wordRoot[word] ?? word;
-    final packed = _families[_rootOf[word] ?? ''];
+    // 自动归并的词族：word 可能是词根，也可能是派生词，两种情况都查一遍。
+    final packed = _families[word] ?? _families[_rootOf[word] ?? ''];
     if (packed != null) return packed;
 
+    final root = _rootOf[word] ?? _wordRoot[word] ?? word;
     final forms = _rootForms[root];
     if (forms == null || forms.isEmpty) return null;
 

@@ -79,7 +79,7 @@ class _WordQuizScreenState extends State<WordQuizScreen>
   late final AnimationController _shake;
 
   int _index = 0;
-  int? _picked;
+  DictEntry? _picked;
   int _correct = 0;
   bool _finished = false;
 
@@ -105,7 +105,7 @@ class _WordQuizScreenState extends State<WordQuizScreen>
     final isRight = entry.word == question.answer.word;
 
     setState(() {
-      _picked = entry.hashCode;
+      _picked = entry;
       if (isRight) _correct++;
     });
 
@@ -329,7 +329,7 @@ class _WordQuizScreenState extends State<WordQuizScreen>
   ) {
     if (!answered) return _OptionState.idle;
     if (option.word == question.answer.word) return _OptionState.correct;
-    if (option.hashCode == _picked) return _OptionState.wrong;
+    if (identical(option, _picked)) return _OptionState.wrong;
     return _OptionState.dim;
   }
 }
