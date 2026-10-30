@@ -10,11 +10,19 @@ class DictEntry {
   /// 0 初级 / 1 中级 / 2 高级
   final int level;
 
+  /// 词性：动 / 名 / 形 / 副 / 连 / 介，空表示未标注
+  final String pos;
+
+  /// 例句（来自词典原文，可能为空）
+  final String example;
+
   const DictEntry({
     required this.word,
     required this.gloss,
     required this.page,
     this.level = 2,
+    this.pos = '',
+    this.example = '',
   });
 }
 
@@ -38,6 +46,8 @@ class Dictionary {
           gloss: (map['g'] as String? ?? '').trim(),
           page: (map['p'] as num?)?.toInt() ?? 0,
           level: (map['lvl'] as num?)?.toInt() ?? 2,
+          pos: (map['pos'] as String?) ?? '',
+          example: (map['ex'] as String?) ?? '',
         );
       }).where((e) => e.word.isNotEmpty).toList();
     } catch (_) {
