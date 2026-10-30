@@ -84,6 +84,7 @@ class _RootShellState extends State<RootShell> {
           HomeScreen(
             key: _homeKey,
             progress: _progress,
+            userPairs: _userPairs,
           ),
           SettingsScreen(
             progress: _progress,

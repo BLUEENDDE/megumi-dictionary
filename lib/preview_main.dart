@@ -62,6 +62,7 @@ class PreviewApp extends StatelessWidget {
           ? const RootShell()
           : HomeScreen(
               progress: progress,
+              userPairs: userPairs,
               initialQuery: params['q'],
             ),
     };

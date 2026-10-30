@@ -14,6 +14,46 @@ class WordQuestion {
   const WordQuestion({required this.answer, required this.options});
 }
 
+/// 组题：每个词一道四选一，正确项 + 最多 3 个干扰项。
+///
+/// 干扰项会避开同一个词、同一个释义（很多词共用一条释义，不去重就会出现
+/// 两个一模一样的选项，选哪个都算对/算错），也会跳过没有释义的词。
+/// 词池为空或太小的时候宁可少给几个选项，也不抛异常。
+List<WordQuestion> buildWordQuestions({
+  required List<DictEntry> words,
+  required List<DictEntry> pool,
+  math.Random? random,
+}) {
+  if (words.isEmpty) return const [];
+
+  final rnd = random ?? math.Random();
+  final source = pool.isEmpty ? words : pool;
+  final result = <WordQuestion>[];
+
+  for (final word in words) {
+    final options = <DictEntry>[word];
+    final usedGlosses = <String>{_glossKey(word.gloss)};
+
+    var guard = 0;
+    while (options.length < 4 && guard < 400) {
+      guard++;
+      final candidate = source[rnd.nextInt(source.length)];
+      if (candidate.word == word.word) continue;
+      if (candidate.gloss.trim().isEmpty) continue;
+      if (!usedGlosses.add(_glossKey(candidate.gloss))) continue;
+      options.add(candidate);
+    }
+
+    options.shuffle(rnd);
+    result.add(WordQuestion(answer: word, options: options));
+  }
+
+  return result;
+}
+
+/// 比较释义是否重复时忽略大小写和首尾空白。
+String _glossKey(String gloss) => gloss.trim().toLowerCase();
+
 /// 单词四选一：给印尼语词，选正确的中文释义。
 class WordQuizScreen extends StatefulWidget {
   final String title;
@@ -46,7 +86,7 @@ class _WordQuizScreenState extends State<WordQuizScreen>
   @override
   void initState() {
     super.initState();
-    _questions = _build();
+    _questions = buildWordQuestions(words: widget.words, pool: widget.pool);
     _shake = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 420),
@@ -57,26 +97,6 @@ class _WordQuizScreenState extends State<WordQuizScreen>
   void dispose() {
     _shake.dispose();
     super.dispose();
-  }
-
-  List<WordQuestion> _build() {
-    final rnd = math.Random();
-    final result = <WordQuestion>[];
-
-    for (final word in widget.words) {
-      final distractors = <DictEntry>[];
-      var guard = 0;
-      while (distractors.length < 3 && guard < 200) {
-        guard++;
-        final candidate = widget.pool[rnd.nextInt(widget.pool.length)];
-        if (candidate.word == word.word) continue;
-        if (distractors.any((d) => d.gloss == candidate.gloss)) continue;
-        distractors.add(candidate);
-      }
-      final options = [word, ...distractors]..shuffle(rnd);
-      result.add(WordQuestion(answer: word, options: options));
-    }
-    return result;
   }
 
   void _pick(DictEntry entry) {
@@ -113,6 +133,29 @@ class _WordQuizScreenState extends State<WordQuizScreen>
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
+
+    if (_questions.isEmpty) {
+      return Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '没有可练的词',
+                  style: TextStyle(fontSize: 15, color: p.muted),
+                ),
+                const SizedBox(height: 20),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  child: const Text('返回'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     if (_finished) {
       final total = _questions.length;

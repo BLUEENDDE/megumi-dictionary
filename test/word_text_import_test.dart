@@ -47,4 +47,19 @@ void main() {
     final r = parseWordList('a |  | b | 乙');
     expect(r.drafts.single.firstGloss, '（还没写释义）');
   });
+
+  test('一行两段也能录：只算一个词，第二个词留空', () {
+    final r = parseWordList('makan | 吃\n# 注释\ntidur | 睡');
+    expect(r.errors, isEmpty);
+    expect(r.drafts.length, 2);
+    expect(r.drafts.first.first, 'makan');
+    expect(r.drafts.first.second, isEmpty);
+    expect(r.drafts.last.firstGloss, '睡');
+  });
+
+  test('三段的行会报错（说不清是一个词还是两个词）', () {
+    final r = parseWordList('a | 甲 | b');
+    expect(r.drafts, isEmpty);
+    expect(r.errors.single, contains('第 1 行'));
+  });
 }

@@ -97,8 +97,9 @@ class _TextImportScreenState extends State<TextImportScreen> {
               borderRadius: BorderRadius.circular(14),
             ),
             child: Text(
-              '一行一组词对，用竖线或逗号分开：\n'
-              '词A | 释义A | 词B | 释义B | 差在哪（可省）\n\n'
+              '一行一个词：词 | 释义\n'
+              '想一次录两个易混词也可以：词A | 释义A | 词B | 释义B | 差在哪（可省）\n\n'
+              '例：besar | 大（体积）\n'
               '例：besar | 大（体积） | luas | 大（面积） | 体积 vs 面积\n'
               '以 # 开头的行会被忽略。',
               style: TextStyle(fontSize: 12, height: 1.8, color: p.primary),
@@ -150,7 +151,7 @@ class _TextImportScreenState extends State<TextImportScreen> {
                 Icon(Icons.check_circle_outline_rounded, size: 16, color: p.success),
                 const SizedBox(width: 6),
                 Text(
-                  '识别到 $count 组词对',
+                  '识别到 $count 条',
                   style: TextStyle(fontSize: 13, color: p.success),
                 ),
               ],
@@ -189,7 +190,7 @@ class _TextImportScreenState extends State<TextImportScreen> {
             ),
             onPressed: count > 0 ? _import : null,
             child: Text(
-              count > 0 ? '添加 $count 组' : '还没有可添加的内容',
+              count > 0 ? '添加 $count 条' : '还没有可添加的内容',
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
             ),
           ),

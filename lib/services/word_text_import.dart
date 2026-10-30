@@ -1,7 +1,8 @@
-/// 文本批量导入：一行一组词对。
+/// 文本批量导入：一行一个词，或者一行一组易混词对。
 ///
+/// 一行两段：词、释义。
+/// 一行四段：词A、A 的释义、词B、B 的释义；第 5 段是"差在哪"（可空）。
 /// 支持的分隔符：竖线 `|`、全角竖线 `｜`、制表符、逗号 `,`、全角逗号 `，`。
-/// 每行至少 4 段：词A、A 的释义、词B、B 的释义；第 5 段是"差在哪"（可空）。
 /// 以 # 开头的行是注释，会被忽略。
 library;
 
@@ -40,15 +41,21 @@ ImportParseResult parseWordList(String raw) {
     if (line.isEmpty || line.startsWith('#')) continue;
 
     final parts = _split(line);
-    if (parts.length < 4) {
-      errors.add('第 ${i + 1} 行：至少要 4 段（词A | 释义A | 词B | 释义B）');
+    if (parts.length != 2 && parts.length < 4) {
+      errors.add(
+        '第 ${i + 1} 行：写成「词 | 释义」，或「词A | 释义A | 词B | 释义B」',
+      );
       continue;
     }
 
     final first = parts[0];
-    final second = parts[2];
-    if (first.isEmpty || second.isEmpty) {
-      errors.add('第 ${i + 1} 行：两个词不能为空');
+    final second = parts.length >= 4 ? parts[2] : '';
+    if (first.isEmpty) {
+      errors.add('第 ${i + 1} 行：词不能为空');
+      continue;
+    }
+    if (parts.length >= 4 && second.isEmpty) {
+      errors.add('第 ${i + 1} 行：第二个词不能为空');
       continue;
     }
 
@@ -57,10 +64,14 @@ ImportParseResult parseWordList(String raw) {
         first: first,
         firstGloss: parts[1].isEmpty ? '（还没写释义）' : parts[1],
         second: second,
-        secondGloss: parts[3].isEmpty ? '（还没写释义）' : parts[3],
+        secondGloss: second.isEmpty
+            ? ''
+            : (parts[3].isEmpty ? '（还没写释义）' : parts[3]),
         summary: parts.length >= 5 && parts[4].isNotEmpty
             ? parts[4]
-            : '$first 和 $second 的区别（待补充）',
+            : second.isEmpty
+                ? first
+                : '$first 和 $second 的区别（待补充）',
       ),
     );
   }

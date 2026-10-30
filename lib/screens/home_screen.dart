@@ -4,6 +4,8 @@ import '../services/dictionary.dart';
 import '../services/family_store.dart';
 import '../services/progress_store.dart';
 import '../services/settings_store.dart';
+import '../services/user_pairs_store.dart';
+import '../services/user_words.dart';
 import '../theme/palette.dart';
 import '../widgets/dict_entry_sheet.dart';
 import '../widgets/ui_kit.dart';
@@ -13,11 +15,13 @@ import 'word_quiz_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final ProgressStore progress;
+  final UserPairsStore userPairs;
   final String? initialQuery;
 
   const HomeScreen({
     super.key,
     required this.progress,
+    required this.userPairs,
     this.initialQuery,
   });
 
@@ -84,8 +88,21 @@ class HomeScreenState extends State<HomeScreen> {
     final q = value.trim();
     setState(() {
       _query = q;
-      _searchResults = q.isEmpty ? const [] : Dictionary.search(q, limit: 30);
+      _searchResults = q.isEmpty ? const [] : _searchEntries(q);
     });
+  }
+
+  /// 搜索先列自建词，再列内置词典；同一个词只出现一次。
+  List<DictEntry> _searchEntries(String q) {
+    final lower = q.toLowerCase();
+    final seen = <String>{};
+    final mine = _userWords.where(
+      (e) => e.word.toLowerCase().contains(lower),
+    );
+    return [
+      ...mine,
+      ...Dictionary.search(q, limit: 30),
+    ].where((e) => seen.add(e.word)).take(30).toList();
   }
 
   String get _listId => SettingsStore.wordList.value;
@@ -98,12 +115,23 @@ class HomeScreenState extends State<HomeScreen> {
 
   String get _listName => SettingsStore.listOptions[_listId] ?? '初级';
 
+  /// 自建词库：把用户录的词对拆成单词条目，设置页加完词切回来就会刷新。
+  List<DictEntry> get _userWords => dictEntriesFromPairs(widget.userPairs.pairs);
+
   List<DictEntry> get _levelWords {
-    if (_listId == 'user') return const [];
+    if (_listId == 'user') return _userWords;
     if (_levelCache != null && _levelCacheKey == _listId) return _levelCache!;
     _levelCache = Dictionary.allOf(level: _level);
     _levelCacheKey = _listId;
     return _levelCache!;
+  }
+
+  /// 出题用的干扰项池：自建词太少时拿初级词库补，免得凑不出四个选项。
+  List<DictEntry> get _quizPool {
+    if (_listId != 'user') return _levelWords;
+    final mine = _userWords;
+    if (mine.length >= 12) return mine;
+    return [...mine, ...Dictionary.allOf(level: 0)];
   }
 
   String _wid(String word) => 'w:$word';
@@ -149,7 +177,7 @@ class HomeScreenState extends State<HomeScreen> {
         WordQuizScreen(
           title: _listName,
           words: words,
-          pool: _levelWords,
+          pool: _quizPool,
           store: _progress,
         ),
       ),
@@ -159,6 +187,10 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void _startReview() {
+    if (_levelWords.isEmpty) {
+      _toast(_emptyListHint);
+      return;
+    }
     final due = _dueWords(SettingsStore.learnBatch.value);
     if (due.isEmpty) {
       _toast('这一册还没有到期的单词');
@@ -168,6 +200,10 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void _startLearn() {
+    if (_levelWords.isEmpty) {
+      _toast(_emptyListHint);
+      return;
+    }
     final words = _unlearnedWords(SettingsStore.learnBatch.value);
     if (words.isEmpty) {
       _toast('这一册都学完了');
@@ -175,6 +211,9 @@ class HomeScreenState extends State<HomeScreen> {
     }
     _runQuiz(words);
   }
+
+  String get _emptyListHint =>
+      _listId == 'user' ? '还没有自建单词，去「我的 → 添加单词」录几个' : '这一册还没有单词';
 
   void _toast(String message) {
     ScaffoldMessenger.of(context)
@@ -266,7 +305,10 @@ class HomeScreenState extends State<HomeScreen> {
       'advanced' => 2,
       _ => null,
     };
-    if (level == null) return '以后放你自建的词库';
+    if (level == null) {
+      final count = _userWords.length;
+      return count == 0 ? '还没加词，去「我的」添加' : '$count 词';
+    }
     return '${Dictionary.countOf(level: level)} 词';
   }
 
@@ -919,12 +961,14 @@ class _WordTile extends StatelessWidget {
   });
 
   Color _levelColor(Palette p) => switch (entry.level) {
+        userWordLevel => p.primary,
         0 => p.success,
         1 => p.primary,
         _ => p.hint,
       };
 
   String get _levelName => switch (entry.level) {
+        userWordLevel => '自',
         0 => '初',
         1 => '中',
         _ => '高',

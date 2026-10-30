@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../app_info.dart';
 import '../models/word_pair.dart';
 import '../services/backup_service.dart';
 import '../services/progress_store.dart';
 import '../services/settings_store.dart';
 import '../services/user_pairs_store.dart';
+import '../services/user_words.dart';
 import '../theme/palette.dart';
 import 'text_import_screen.dart';
 
@@ -320,7 +322,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _Tile(
                   icon: Icons.add_circle_outline_rounded,
                   title: '添加单词',
-                  subtitle: '一行一组词对，粘贴文本批量录入',
+                  subtitle: '一行一个词：词 | 释义，粘贴文本批量录入',
                   onTap: () async {
                     final added = await Navigator.of(context).push<int>(
                       MaterialPageRoute(
@@ -332,7 +334,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     if (!mounted) return;
                     if (added != null && added > 0) {
                       setState(() {});
-                      _toast('已添加 $added 组词对');
+                      _toast('已添加 $added 条');
                     }
                   },
                 ),
@@ -380,11 +382,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 _InfoRow(label: '名称', value: 'megumi辞書'),
                 const SizedBox(height: 10),
-                _InfoRow(label: '自建词库', value: '${widget.userPairs.pairs.length} 组'),
+                _InfoRow(
+                  label: '自建词库',
+                  value: '${dictEntriesFromPairs(widget.userPairs.pairs).length} 词',
+                ),
                 const SizedBox(height: 10),
                 _InfoRow(label: '已掌握', value: '${widget.progress.trainedPairs} 组'),
                 const SizedBox(height: 10),
-                _InfoRow(label: '版本', value: '3.9.0'),
+                _InfoRow(label: '版本', value: appVersion),
               ],
             ),
           ),
