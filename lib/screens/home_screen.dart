@@ -992,21 +992,7 @@ class _WordTile extends StatelessWidget {
                         style: TextStyle(fontSize: 12.5, color: p.muted),
                       ),
                     ),
-                    if (entry.example.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 26, top: 3),
-                        child: Text(
-                          entry.example,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            height: 1.4,
-                            color: p.hint,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ),
+
                   ],
                 ),
               ),

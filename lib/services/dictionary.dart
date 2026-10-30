@@ -16,6 +16,9 @@ class DictEntry {
   /// 例句（来自词典原文，可能为空）
   final String example;
 
+  /// 例句的中文翻译，可能为空
+  final String exampleCn;
+
   const DictEntry({
     required this.word,
     required this.gloss,
@@ -23,6 +26,7 @@ class DictEntry {
     this.level = 2,
     this.pos = '',
     this.example = '',
+    this.exampleCn = '',
   });
 }
 
@@ -48,6 +52,7 @@ class Dictionary {
           level: (map['lvl'] as num?)?.toInt() ?? 2,
           pos: (map['pos'] as String?) ?? '',
           example: (map['ex'] as String?) ?? '',
+          exampleCn: (map['exc'] as String?) ?? '',
         );
       }).where((e) => e.word.isNotEmpty).toList();
     } catch (_) {
