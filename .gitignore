@@ -46,3 +46,6 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# \u5bfc\u51fa\u7684\u8bcd\u5e93\u6570\u636e
+/export/
