@@ -4,4 +4,4 @@
 /// test/version_test.dart 会在测试时读 pubspec 校验，改一处忘了另一处会直接报错。
 library;
 
-const String appVersion = '3.9.0';
+const String appVersion = '3.10.0';
