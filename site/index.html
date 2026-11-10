@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>megumi辞書 · 印尼语背词</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">MEGUMI · 辞書</div>
+  <h1>印尼语背词</h1>
+  <p class="sub">一个词一个词地记，右边的图标能看词根关系。</p>
+</header>
+
+<section class="controls">
+  <div class="levels" id="levels">
+    <button class="pill active" data-level="0">初级</button>
+    <button class="pill" data-level="1">中级</button>
+    <button class="pill" data-level="2">高级</button>
+  </div>
+  <div class="actions">
+    <select id="batch" title="每组词数">
+      <option value="10">10 词</option>
+      <option value="20" selected>20 词</option>
+      <option value="30">30 词</option>
+      <option value="50">50 词</option>
+    </select>
+    <button class="primary" id="startQuiz">开始测验</button>
+  </div>
+</section>
+
+<section class="searchbar">
+  <input id="search" type="search" placeholder="搜词或释义" autocomplete="off">
+</section>
+
+<section class="meta">
+  <span id="count">加载中…</span>
+  <span id="hint" class="hint"></span>
+</section>
+
+<main id="list" class="list"></main>
+<div class="more"><button id="more">加载更多</button></div>
+
+<div class="modal" id="modal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true">
+    <button class="close" id="closeModal" aria-label="关闭">×</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<div class="modal" id="quiz" hidden>
+  <div class="sheet quiz-sheet" role="dialog" aria-modal="true">
+    <button class="close" id="closeQuiz" aria-label="关闭">×</button>
+    <div id="quizBody"></div>
+  </div>
+</div>
+
+<script src="data/dictionary.js"></script>
+<script src="data/families.js"></script>
+<script src="data/affixes.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

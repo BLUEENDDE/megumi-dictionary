@@ -49,3 +49,6 @@ app.*.map.json
 
 # \u5bfc\u51fa\u7684\u8bcd\u5e93\u6570\u636e
 /export/
+
+# \u7f51\u9875\u7248\u7684\u8bcd\u5e93\u6570\u636e
+/site/data/
