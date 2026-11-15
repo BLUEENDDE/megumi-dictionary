@@ -52,11 +52,13 @@ function applyFilter() {
       ? state.newBase
       : state.entries.filter((e) => e.lvl === state.level);
   state.filtered = q
-    ? base.filter(
-        (e) =>
-          e.w.toLowerCase().includes(q) ||
-          (e.g || '').toLowerCase().includes(q)
-      )
+    ? state.newBase
+        .concat(state.entries)
+        .filter(
+          (e) =>
+            e.w.toLowerCase().includes(q) ||
+            (e.g || '').toLowerCase().includes(q)
+        )
     : base;
   state.shown = 0;
   $('list').innerHTML = '';
@@ -315,7 +317,7 @@ loadData().then(() => {
   }
   const word = params.get('w');
   if (word) {
-    const src = state.level === -1 ? state.newBase : state.entries;
+    const src = state.newBase.concat(state.entries);
     const entry = src.find((e) => e.w === word) || state.entries.find((e) => e.w === word);
     if (entry) openDetail(entry);
   }

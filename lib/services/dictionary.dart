@@ -89,6 +89,41 @@ class Dictionary {
     _loaded = true;
   }
 
+  /// 搜索时把教材词也带上：同一个词两边都有时，教材词优先（带课次和语法）。
+  static List<DictEntry> searchAll(String query, {int limit = 80}) {
+    final base = search(query, limit: limit);
+    final book = searchIn(_newBase1, query, limit: limit);
+    final out = <DictEntry>[];
+    final seen = <String>{};
+    for (final e in book) {
+      if (seen.add(e.word)) out.add(e);
+    }
+    for (final e in base) {
+      if (seen.add(e.word)) out.add(e);
+    }
+    return out.take(limit).toList();
+  }
+
+  static List<DictEntry> searchIn(
+    List<DictEntry> src,
+    String query,
+    {int limit = 80}
+  ) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return const [];
+    final prefix = <DictEntry>[];
+    final contains = <DictEntry>[];
+    for (final e in src) {
+      final w = e.word.toLowerCase();
+      if (w.startsWith(q)) {
+        prefix.add(e);
+      } else if (w.contains(q) || e.gloss.contains(q)) {
+        contains.add(e);
+      }
+    }
+    return [...prefix, ...contains].take(limit).toList();
+  }
+
   static List<DictEntry> search(String query, {int limit = 80}) {
     final q = query.trim().toLowerCase();
     if (q.isEmpty) return const [];
