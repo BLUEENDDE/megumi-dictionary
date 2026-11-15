@@ -30,7 +30,7 @@ void main() {
   test('导出再导入，词对和进度都对得上', () async {
     final store = ProgressStore();
     await store.load();
-    await store.record('user-9', true);
+    await store.record('user-9', true, isReview: true);
 
     final text = BackupService.encode(userPairs: [_pair], progress: store);
     expect(text.contains('indonesia_vocab'), isTrue);

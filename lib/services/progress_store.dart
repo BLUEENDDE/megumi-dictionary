@@ -13,6 +13,9 @@ class PairStat {
   /// 记忆盒子：0 = 刚错/没记牢，越大越熟。
   final int box;
 
+  /// 复习次数（新学不计入）。
+  final int reviews;
+
   /// 下次该复习的时间（毫秒时间戳），null 表示还没练过。
   final int? dueAt;
 
@@ -20,8 +23,12 @@ class PairStat {
     this.seen = 0,
     this.right = 0,
     this.box = 0,
+    this.reviews = 0,
     this.dueAt,
   });
+
+  /// 已经复习过至少一次。
+  bool get reviewed => reviews > 0;
 
   bool get untrained => seen == 0;
 
@@ -84,6 +91,7 @@ class ProgressStore {
         seen: (item['seen'] as num?)?.toInt() ?? 0,
         right: (item['right'] as num?)?.toInt() ?? 0,
         box: (item['box'] as num?)?.toInt() ?? 0,
+        reviews: (item['reviews'] as num?)?.toInt() ?? 0,
         dueAt: (item['dueAt'] as num?)?.toInt(),
       );
     });
@@ -100,6 +108,7 @@ class ProgressStore {
             'seen': value.seen,
             'right': value.right,
             'box': value.box,
+            'reviews': value.reviews,
             'dueAt': value.dueAt,
           }),
         ),
@@ -134,8 +143,12 @@ class ProgressStore {
   List<WordPair> learnedPairs(List<WordPair> pairs) =>
       pairs.where((p) => statFor(p.id).learned).toList();
 
-  /// 复习走完所有盒子 = 掌握。
-  bool isMastered(String pairId) => statFor(pairId).box >= maxBox;
+  /// 掌握 = 学过 + 复习过至少一次且答对（盒子推进过）。
+  /// 新学的词只算「已学」，不会因为刚见过就算掌握。
+  bool isMastered(String pairId) {
+    final s = statFor(pairId);
+    return s.learned && s.reviewed && s.box >= 1;
+  }
 
   /// 已掌握的词对。
   List<WordPair> masteredPairs(List<WordPair> pairs) =>
@@ -154,21 +167,37 @@ class ProgressStore {
     return due;
   }
 
-  Future<void> record(String pairId, bool isRight) async {
+  /// 记录一次作答。
+  ///
+  /// [isReview] = false 是「新学」：只标记学过，盒子不动，立刻可复习；
+  /// = true 才是复习，答对推进盒子（并可能变成掌握），答对打回 0。
+  Future<void> record(
+    String pairId,
+    bool isRight, {
+    bool isReview = false,
+  }) async {
     final current = statFor(pairId);
+    final now = DateTime.now();
 
-    final nextBox = isRight
-        ? math.min(current.box + 1, maxBox)
-        : 0;
-    final days = _intervals[nextBox];
-    final due = DateTime.now()
-        .add(Duration(days: days))
-        .millisecondsSinceEpoch;
+    final int nextBox;
+    final int nextReviews;
+    final int due;
+
+    if (!isReview) {
+      nextBox = 0;
+      nextReviews = current.reviews;
+      due = now.millisecondsSinceEpoch;
+    } else {
+      nextBox = isRight ? math.min(current.box + 1, maxBox) : 0;
+      nextReviews = current.reviews + 1;
+      due = now.add(Duration(days: _intervals[nextBox])).millisecondsSinceEpoch;
+    }
 
     _pairs[pairId] = PairStat(
       seen: current.seen + 1,
       right: current.right + (isRight ? 1 : 0),
       box: nextBox,
+      reviews: nextReviews,
       dueAt: due,
     );
 

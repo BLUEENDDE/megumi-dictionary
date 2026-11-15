@@ -36,11 +36,6 @@ class HomeScreenState extends State<HomeScreen> {
   String _query = '';
   List<DictEntry> _searchResults = const [];
 
-  /// 列表显示多少页（每页 = 当前「每组词数」）
-  int _pages = 1;
-
-  int get _displayCount =>
-      SettingsStore.learnBatch.value.clamp(1, 100) * _pages;
 
   List<DictEntry>? _levelCache;
   String? _levelCacheKey;
@@ -172,12 +167,13 @@ class HomeScreenState extends State<HomeScreen> {
     return out;
   }
 
-  Future<void> _runQuiz(List<DictEntry> words) async {
+  Future<void> _runQuiz(List<DictEntry> words, {bool isReview = false}) async {
     if (words.isEmpty) return;
     await Navigator.of(context).push(
       fadeUpRoute(
         WordQuizScreen(
           title: _listName,
+          isReview: isReview,
           words: words,
           pool: _quizPool,
           store: _progress,
@@ -198,7 +194,7 @@ class HomeScreenState extends State<HomeScreen> {
       _toast('这一册还没有到期的单词');
       return;
     }
-    _runQuiz(due);
+    _runQuiz(due, isReview: true);
   }
 
   void _startLearn() {
@@ -206,12 +202,13 @@ class HomeScreenState extends State<HomeScreen> {
       _toast(_emptyListHint);
       return;
     }
-    final words = _unlearnedWords(SettingsStore.learnBatch.value);
+    final batch = SettingsStore.learnBatch.value.clamp(1, 100);
+    final words = _unlearnedWords(batch);
     if (words.isEmpty) {
       _toast('这一册都学完了');
       return;
     }
-    _runQuiz(words);
+    _runQuiz(words);  // 新学：只标记学过
   }
 
   String get _emptyListHint =>
@@ -295,7 +292,6 @@ class HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
     setState(() {
       _levelCache = null;
-      _pages = 1;
       _recount();
     });
   }
@@ -318,7 +314,6 @@ class HomeScreenState extends State<HomeScreen> {
     await Navigator.of(context).push(fadeUpRoute(const LearnSettingsScreen()));
     if (!mounted) return;
     setState(() {
-      _pages = 1;
       _recount();
     });
   }
@@ -339,7 +334,8 @@ class HomeScreenState extends State<HomeScreen> {
     final mastered = _masteredCount;
     final due = _dueCount;
     final total = _levelWords.length;
-    final words = _levelWords.take(_displayCount).toList();
+    final batch = SettingsStore.learnBatch.value.clamp(1, 100);
+    final words = _unlearnedWords(batch);
 
     return Scaffold(
       body: SafeArea(
@@ -472,7 +468,7 @@ class HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '${words.length} / $total',
+                    '待学 ${words.length} / $total',
                     style: TextStyle(fontSize: 13, color: p.muted),
                   ),
                 ],
@@ -485,19 +481,6 @@ class HomeScreenState extends State<HomeScreen> {
                     entry: entry,
                     onTap: () => showDictEntrySheet(context, entry),
                     onFamily: () => _openFamily(entry.word),
-                  ),
-                ),
-              if (words.length < total)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Center(
-                    child: TextButton(
-                      onPressed: () => setState(() => _pages += 1),
-                      child: Text(
-                        '加载更多',
-                        style: TextStyle(fontSize: 13, color: p.primary),
-                      ),
-                    ),
                   ),
                 ),
             ],

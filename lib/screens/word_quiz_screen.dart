@@ -57,6 +57,9 @@ String _glossKey(String gloss) => gloss.trim().toLowerCase();
 /// 单词四选一：给印尼语词，选正确的中文释义。
 class WordQuizScreen extends StatefulWidget {
   final String title;
+
+  /// true = 复习（推进记忆盒子、可能变掌握）；false = 新学。
+  final bool isReview;
   final List<DictEntry> words;
   final List<DictEntry> pool;
   final ProgressStore store;
@@ -64,6 +67,7 @@ class WordQuizScreen extends StatefulWidget {
   const WordQuizScreen({
     super.key,
     required this.title,
+    this.isReview = false,
     required this.words,
     required this.pool,
     required this.store,
@@ -109,7 +113,11 @@ class _WordQuizScreenState extends State<WordQuizScreen>
       if (isRight) _correct++;
     });
 
-    widget.store.record('w:${question.answer.word}', isRight);
+    widget.store.record(
+      'w:${question.answer.word}',
+      isRight,
+      isReview: widget.isReview,
+    );
 
     if (isRight) {
       HapticFeedback.lightImpact();
