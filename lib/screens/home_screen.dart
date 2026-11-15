@@ -121,6 +121,7 @@ class HomeScreenState extends State<HomeScreen> {
 
   List<DictEntry> get _levelWords {
     if (_listId == 'user') return _userWords;
+    if (_listId == 'newbase1') return Dictionary.newBase1;
     if (_levelCache != null && _levelCacheKey == _listId) return _levelCache!;
     _levelCache = Dictionary.allOf(level: _level);
     _levelCacheKey = _listId;
