@@ -197,7 +197,7 @@ function startQuiz() {
       : state.entries.filter((e) => e.lvl === state.level);
   const n = Math.min(Number($('batch').value), pool.length);
   const picked = shuffle([...pool]).slice(0, n);
-  quiz = { list: picked, pool, index: 0, right: 0 };
+  quiz = { list: picked, pool, index: 0, right: 0, passes: {}, round: 1, all: picked };
   $('quiz').hidden = false;
   renderQuestion();
 }
@@ -205,8 +205,16 @@ function startQuiz() {
 function renderQuestion() {
   const { list, index, pool } = quiz;
   if (index >= list.length) {
+    const remaining = quiz.list.filter((w) => (quiz.passes[w.w] || 0) < 2);
+    if (remaining.length) {
+      quiz.round++;
+      quiz.list = remaining;
+      quiz.index = 0;
+      renderQuestion();
+      return;
+    }
     $('quizBody').innerHTML =
-      `<div class="qdone"><div class="score">${quiz.right} / ${list.length}</div>` +
+      `<div class="qdone"><div class="score">${quiz.right} / ${quiz.all.length}</div>` +
       `<p class="hint">这一组过完了</p>` +
       `<button class="primary" style="margin-top:18px" onclick="closeQuiz()">完成</button></div>`;
     return;
@@ -250,7 +258,13 @@ function answer(btn, opt, q) {
     else if (b === btn) b.classList.add('wrong');
     else b.classList.add('dim');
   });
-  if (right) quiz.right++;
+  if (right) {
+    const pass = (quiz.passes[q.w] || 0) + 1;
+    quiz.passes[q.w] = pass;
+    if (pass >= 2) quiz.right++;
+  } else {
+    quiz.passes[q.w] = 0;
+  }
   setTimeout(() => {
     quiz.index++;
     renderQuestion();

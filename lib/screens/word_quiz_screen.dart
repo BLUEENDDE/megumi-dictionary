@@ -87,10 +87,23 @@ class _WordQuizScreenState extends State<WordQuizScreen>
   int _correct = 0;
   bool _finished = false;
 
+  /// 本轮要过的词
+  List<DictEntry> _roundWords = const [];
+
+  /// 本轮结束后还要再过一轮的词
+  List<DictEntry> _pending = const [];
+
+  /// 每个词已答对的次数（一轮学习要答对两次）
+  final Map<String, int> _passes = {};
+
+  int _round = 1;
+  bool _roundBreak = false;
+
   @override
   void initState() {
     super.initState();
-    _questions = buildWordQuestions(words: widget.words, pool: widget.pool);
+    _roundWords = [...widget.words];
+    _questions = buildWordQuestions(words: _roundWords, pool: widget.pool);
     _shake = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 420),
@@ -107,17 +120,24 @@ class _WordQuizScreenState extends State<WordQuizScreen>
     if (_picked != null) return;
     final question = _questions[_index];
     final isRight = entry.word == question.answer.word;
+    final word = question.answer.word;
+
+    if (isRight) {
+      final pass = (_passes[word] ?? 0) + 1;
+      _passes[word] = pass;
+      if (pass >= 2) {
+        // 两轮都答对，才算这个词过完，记一次成绩
+        _correct++;
+        widget.store.record('w:$word', true, isReview: widget.isReview);
+      }
+    } else {
+      // 答错清零，等这一轮结束后重来
+      _passes[word] = 0;
+    }
 
     setState(() {
       _picked = entry;
-      if (isRight) _correct++;
     });
-
-    widget.store.record(
-      'w:${question.answer.word}',
-      isRight,
-      isReview: widget.isReview,
-    );
 
     if (isRight) {
       HapticFeedback.lightImpact();
@@ -128,13 +148,39 @@ class _WordQuizScreenState extends State<WordQuizScreen>
   }
 
   void _next() {
-    if (_index + 1 >= _questions.length) {
+    if (_index + 1 < _questions.length) {
+      setState(() {
+        _index++;
+        _picked = null;
+      });
+      return;
+    }
+
+    final remaining =
+        _roundWords.where((w) => (_passes[w.word] ?? 0) < 2).toList();
+    if (remaining.isEmpty) {
       setState(() => _finished = true);
       return;
     }
+
     setState(() {
-      _index++;
+      _pending = remaining;
+      _roundBreak = true;
       _picked = null;
+    });
+  }
+
+  void _startNextRound() {
+    setState(() {
+      _round++;
+      _roundWords = _pending;
+      _questions = buildWordQuestions(
+        words: _roundWords,
+        pool: widget.pool,
+      );
+      _index = 0;
+      _picked = null;
+      _roundBreak = false;
     });
   }
 
@@ -166,7 +212,7 @@ class _WordQuizScreenState extends State<WordQuizScreen>
     }
 
     if (_finished) {
-      final total = _questions.length;
+      final total = widget.words.length;
       return Scaffold(
         body: SafeArea(
           child: Center(
@@ -214,6 +260,54 @@ class _WordQuizScreenState extends State<WordQuizScreen>
       );
     }
 
+    if (_roundBreak) {
+      return Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '第 $_round 轮结束',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: p.ink,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  '还有 ${_pending.length} 个词没答对两次，再来一轮',
+                  style: TextStyle(fontSize: 13.5, color: p.muted),
+                ),
+                const SizedBox(height: 26),
+                SizedBox(
+                  width: 220,
+                  height: 48,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: p.primary,
+                      foregroundColor: context.isDark
+                          ? const Color(0xFF10231F)
+                          : Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    onPressed: _startNextRound,
+                    child: Text(
+                      '开始第 ${_round + 1} 轮',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     final question = _questions[_index];
     final answered = _picked != null;
 
@@ -224,7 +318,7 @@ class _WordQuizScreenState extends State<WordQuizScreen>
           onPressed: () => Navigator.of(context).maybePop(_correct),
         ),
         title: Text(
-          '${widget.title} · ${_index + 1}/${_questions.length}',
+          '${widget.title} · 第 $_round 轮 · ${_index + 1}/${_questions.length}',
           style: TextStyle(fontSize: 14, color: p.muted),
         ),
       ),
@@ -236,7 +330,9 @@ class _WordQuizScreenState extends State<WordQuizScreen>
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
-                  value: (_index + (answered ? 1 : 0)) / _questions.length,
+                  value: widget.words.isEmpty
+                      ? 0
+                      : _correct / widget.words.length,
                   minHeight: 4,
                   backgroundColor: p.divider,
                   valueColor: AlwaysStoppedAnimation<Color>(p.primary),
