@@ -2,6 +2,7 @@ const LEVEL_NAME = ['初', '中', '高'];
 
 const state = {
   entries: [],
+  newBase: [],
   families: [],
   roots: new Map(),      // 词 -> 词根
   affixes: new Map(),    // 词 -> 词缀
@@ -17,9 +18,11 @@ const $ = (id) => document.getElementById(id);
 async function loadData() {
   // 数据以 js 变量引入，file:// 直接打开也能用
   const dict = window.__DICT__ || [];
+  const book = window.__NEWBASE1__ || [];
   const fams = window.__FAMS__ || [];
   const aff = window.__AFFIX__ || {};
   state.entries = dict;
+  state.newBase = book.map((e) => Object.assign({}, e, { lvl: -1 }));
   state.families = fams;
   for (const [word, [root, affix]] of Object.entries(aff || {})) {
     state.roots.set(word, root);
@@ -44,7 +47,10 @@ function hasFamily(word) {
 
 function applyFilter() {
   const q = state.query.trim().toLowerCase();
-  const base = state.entries.filter((e) => e.lvl === state.level);
+  const base =
+    state.level === -1
+      ? state.newBase
+      : state.entries.filter((e) => e.lvl === state.level);
   state.filtered = q
     ? base.filter(
         (e) =>
@@ -81,7 +87,12 @@ function rowOf(e) {
   const lvl = document.createElement('span');
   lvl.className = 'lvl';
   lvl.dataset.l = e.lvl;
-  lvl.textContent = LEVEL_NAME[e.lvl] || '高';
+  if (e.lesson) {
+    const num = (e.lesson.match(/[0-9]+/) || [])[0];
+    lvl.textContent = num ? '课' + num : '课';
+  } else {
+    lvl.textContent = LEVEL_NAME[e.lvl] || '高';
+  }
   row.appendChild(lvl);
 
   const body = document.createElement('div');
@@ -134,12 +145,19 @@ function openDetail(e, note, family) {
   const parts = [];
   parts.push(`<h2 class="detail-word">${esc(e.w)}</h2>`);
   if (e.pos) parts.push(`<span class="detail-pos">${esc(e.pos)}</span>`);
+  if (e.lesson) parts.push(`<span class="detail-pos" style="margin-left:6px">${esc(e.lesson)}</span>`);
   parts.push(`<p class="detail-gloss">${esc(e.g || '（暂无释义）')}</p>`);
 
   if (e.ex) {
     parts.push('<div class="exbox"><div class="label">例句</div>');
     parts.push(`<div class="id">${esc(e.ex)}</div>`);
     if (e.exc) parts.push(`<div class="cn">${esc(e.exc)}</div>`);
+    parts.push('</div>');
+  }
+
+  if (e.gr) {
+    parts.push('<div class="exbox"><div class="label">语法</div>');
+    parts.push(`<div class="cn" style="margin-top:6px">${esc(e.gr)}</div>`);
     parts.push('</div>');
   }
 
@@ -170,7 +188,11 @@ function esc(s) {
 let quiz = null;
 
 function startQuiz() {
-  const pool = state.filtered.length ? state.filtered : state.entries.filter((e) => e.lvl === state.level);
+  const pool = state.filtered.length
+    ? state.filtered
+    : state.level === -1
+      ? state.newBase
+      : state.entries.filter((e) => e.lvl === state.level);
   const n = Math.min(Number($('batch').value), pool.length);
   const picked = shuffle([...pool]).slice(0, n);
   quiz = { list: picked, pool, index: 0, right: 0 };
@@ -251,7 +273,7 @@ $('levels').addEventListener('click', (ev) => {
   if (!btn) return;
   document.querySelectorAll('.pill').forEach((p) => p.classList.remove('active'));
   btn.classList.add('active');
-  state.level = Number(btn.dataset.level);
+  state.level = btn.dataset.level === 'book' ? -1 : Number(btn.dataset.level);
   applyFilter();
 });
 
@@ -283,9 +305,18 @@ loadData().then(() => {
   applyFilter();
   // 便于截图/直达：?w=单词 打开详情，?quiz=1 直接开始测验
   const params = new URLSearchParams(location.search);
+  const lv = params.get('level');
+  if (lv) {
+    document.querySelectorAll('.pill').forEach((p) => {
+      p.classList.toggle('active', p.dataset.level === lv);
+    });
+    state.level = lv === 'book' ? -1 : Number(lv);
+    applyFilter();
+  }
   const word = params.get('w');
   if (word) {
-    const entry = state.entries.find((e) => e.w === word);
+    const src = state.level === -1 ? state.newBase : state.entries;
+    const entry = src.find((e) => e.w === word) || state.entries.find((e) => e.w === word);
     if (entry) openDetail(entry);
   }
   if (params.get('quiz') === '1') startQuiz();

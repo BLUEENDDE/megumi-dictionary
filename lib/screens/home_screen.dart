@@ -110,6 +110,7 @@ class HomeScreenState extends State<HomeScreen> {
   int get _level => switch (_listId) {
         'intermediate' => 1,
         'advanced' => 2,
+        'newbase1' => -1,
         _ => 0,
       };
 

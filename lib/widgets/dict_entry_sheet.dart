@@ -115,6 +115,35 @@ void showDictEntrySheet(BuildContext context, DictEntry entry) {
                 ),
               ),
             ],
+            if (entry.grammar.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                decoration: BoxDecoration(
+                  color: bp.card,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: bp.divider),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '语法',
+                      style: TextStyle(fontSize: 10.5, color: bp.hint),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      entry.grammar,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        height: 1.7,
+                        color: bp.muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
             Row(
               children: [

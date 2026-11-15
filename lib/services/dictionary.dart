@@ -19,6 +19,12 @@ class DictEntry {
   /// 例句的中文翻译，可能为空
   final String exampleCn;
 
+  /// 教材课次，例如「第15课」；为空表示不是教材词条
+  final String lesson;
+
+  /// 例句的语法说明（教材词条专用）
+  final String grammar;
+
   const DictEntry({
     required this.word,
     required this.gloss,
@@ -27,6 +33,8 @@ class DictEntry {
     this.pos = '',
     this.example = '',
     this.exampleCn = '',
+    this.lesson = '',
+    this.grammar = '',
   });
 }
 
@@ -58,6 +66,26 @@ class Dictionary {
     } catch (_) {
       _entries = const [];
     }
+    try {
+      final raw = await rootBundle.loadString('assets/newbase1.json');
+      final list = jsonDecode(raw) as List<dynamic>;
+      _newBase1 = list.map((item) {
+        final map = item as Map<String, dynamic>;
+        return DictEntry(
+          word: (map['w'] as String? ?? '').trim(),
+          gloss: (map['g'] as String? ?? '').trim(),
+          page: 0,
+          level: -1,
+          pos: (map['pos'] as String?) ?? '',
+          example: (map['ex'] as String?) ?? '',
+          exampleCn: (map['exc'] as String?) ?? '',
+          lesson: (map['lesson'] as String?) ?? '',
+          grammar: (map['gr'] as String?) ?? '',
+        );
+      }).where((e) => e.word.isNotEmpty).toList();
+    } catch (_) {
+      _newBase1 = const [];
+    }
     _loaded = true;
   }
 
@@ -80,6 +108,11 @@ class Dictionary {
 
     return [...prefix, ...contains].take(limit).toList();
   }
+
+  /// 《新编基础印尼语一》的 460 条生词
+  static List<DictEntry> _newBase1 = const [];
+
+  static List<DictEntry> get newBase1 => _newBase1;
 
   static Map<String, DictEntry>? _byWord;
 
