@@ -11,6 +11,7 @@ import '../widgets/dict_entry_sheet.dart';
 import '../widgets/ui_kit.dart';
 import 'family_screen.dart';
 import 'learn_settings_screen.dart';
+import 'review_list_screen.dart';
 import 'word_quiz_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -194,7 +195,18 @@ class HomeScreenState extends State<HomeScreen> {
       _toast('这一册还没有到期的单词');
       return;
     }
-    _runQuiz(due, isReview: true);
+    Navigator.of(context).push(
+      fadeUpRoute(
+        ReviewListScreen(
+          title: _listName,
+          words: due,
+          pool: _quizPool,
+          store: _progress,
+        ),
+      ),
+    ).then((_) {
+      if (mounted) setState(_recount);
+    });
   }
 
   void _startLearn() {

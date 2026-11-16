@@ -208,7 +208,7 @@ function renderQuestion() {
     const remaining = quiz.list.filter((w) => (quiz.passes[w.w] || 0) < 2);
     if (remaining.length) {
       quiz.round++;
-      quiz.list = remaining;
+      quiz.list = remaining.sort(() => Math.random() - 0.5);
       quiz.index = 0;
       renderQuestion();
       return;
@@ -221,7 +221,8 @@ function renderQuestion() {
   }
   const q = list[index];
   const target = (q.g || '').length;
-  const cands = pool.filter((c) => {
+  const source = quiz.all.length >= 4 ? quiz.all : pool;
+  const cands = source.filter((c) => {
     const g = (c.g || '').trim();
     return c.w !== q.w && g && g !== q.g && g.length <= Math.max(26, target * 2);
   });

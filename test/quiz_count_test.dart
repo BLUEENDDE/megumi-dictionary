@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:indonesia_vocab/screens/review_list_screen.dart';
 import 'package:indonesia_vocab/screens/word_quiz_screen.dart';
 import 'package:indonesia_vocab/services/dictionary.dart';
 import 'package:indonesia_vocab/services/progress_store.dart';
@@ -89,5 +90,54 @@ void main() {
 
     expect(find.textContaining('第 2 轮'), findsWidgets);
     expect(find.textContaining('1/3'), findsWidgets);
+  });
+
+  testWidgets('选项只来自这一组选中的词', (tester) async {
+    await _pumpQuiz(tester, _words(6));
+
+    final glosses = {for (var i = 0; i < 6; i++) '词 $i'};
+    final shown = tester
+        .widgetList<Text>(find.byType(Text))
+        .map((t) => t.data ?? '')
+        .where((t) => t.startsWith('词 '))
+        .toList();
+
+    expect(shown.length, greaterThanOrEqualTo(2));
+    for (final g in shown) {
+      expect(glosses.contains(g), isTrue, reason: '出现了本组以外的选项：$g');
+    }
+    // 正确答案在其中
+    expect(shown.where(glosses.contains).length, shown.length);
+  });
+
+  testWidgets('复习先显示词表，点开始复习才进入测验', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = ProgressStore();
+    await store.load();
+    final words = _words(3);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Palette.light, Brightness.light),
+        home: ReviewListScreen(
+          title: '测试',
+          words: words,
+          pool: words,
+          store: store,
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.text('kata0'), findsOneWidget);
+    expect(find.text('kata2'), findsOneWidget);
+    expect(find.text('开始复习'), findsOneWidget);
+    // 还没进测验
+    expect(find.textContaining('第 1 轮'), findsNothing);
+
+    await tester.tap(find.text('开始复习'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+
+    expect(find.textContaining('第 1 轮'), findsWidgets);
   });
 }

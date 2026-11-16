@@ -80,6 +80,10 @@ class WordQuizScreen extends StatefulWidget {
 class _WordQuizScreenState extends State<WordQuizScreen>
     with SingleTickerProviderStateMixin {
   late List<WordQuestion> _questions;
+
+  /// 干扰项只从本组选中的词里来；词太少时才借用大词池。
+  List<DictEntry> get _optionPool =>
+      widget.words.length >= 4 ? widget.words : widget.pool;
   late final AnimationController _shake;
 
   int _index = 0;
@@ -103,7 +107,7 @@ class _WordQuizScreenState extends State<WordQuizScreen>
   void initState() {
     super.initState();
     _roundWords = [...widget.words];
-    _questions = buildWordQuestions(words: _roundWords, pool: widget.pool);
+    _questions = buildWordQuestions(words: _roundWords, pool: _optionPool);
     _shake = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 420),
@@ -173,10 +177,11 @@ class _WordQuizScreenState extends State<WordQuizScreen>
   void _startNextRound() {
     setState(() {
       _round++;
-      _roundWords = _pending;
+      // 第二轮开始乱序
+      _roundWords = [..._pending]..shuffle(math.Random());
       _questions = buildWordQuestions(
         words: _roundWords,
-        pool: widget.pool,
+        pool: _optionPool,
       );
       _index = 0;
       _picked = null;
