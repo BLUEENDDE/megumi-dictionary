@@ -140,4 +140,41 @@ void main() {
 
     expect(find.textContaining('第 1 轮'), findsWidgets);
   });
+
+  testWidgets('复习词表点词条能打开详情（例句 / 词根）', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = ProgressStore();
+    await store.load();
+    final words = [
+      const DictEntry(
+        word: 'tanah',
+        gloss: '土；土地',
+        pos: '名',
+        page: 0,
+        level: 0,
+        example: 'Petani itu bekerja di tanah yang subur.',
+        exampleCn: '那个农民在肥沃的土地上劳作。',
+      ),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Palette.light, Brightness.light),
+        home: ReviewListScreen(
+          title: '测试',
+          words: words,
+          pool: words,
+          store: store,
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+
+    await tester.tap(find.text('tanah'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 400));
+
+    expect(find.textContaining('Petani itu bekerja'), findsWidgets);
+    expect(find.text('例句'), findsOneWidget);
+    expect(find.text('名'), findsWidgets);
+  });
 }

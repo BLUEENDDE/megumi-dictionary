@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/dictionary.dart';
 import '../services/progress_store.dart';
 import '../theme/palette.dart';
+import '../widgets/dict_entry_sheet.dart';
 import '../widgets/ui_kit.dart';
 import 'word_quiz_screen.dart';
 
@@ -46,7 +47,7 @@ class ReviewListScreen extends StatelessWidget {
                   ),
                   const Spacer(),
                   Text(
-                    '第一轮正序，第二轮乱序',
+                    '点词条看例句 / 词根 · 第一轮正序，第二轮乱序',
                     style: TextStyle(fontSize: 11.5, color: p.hint),
                   ),
                 ],
@@ -59,47 +60,83 @@ class ReviewListScreen extends StatelessWidget {
                 separatorBuilder: (context, index) => const SizedBox(height: 8),
                 itemBuilder: (context, index) {
                   final e = words[index];
-                  return Container(
-                    padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
-                    decoration: BoxDecoration(
-                      color: p.card,
+                  return Material(
+                    color: p.card,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
                       borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 26,
-                          child: Text(
-                            '${index + 1}',
-                            style: TextStyle(fontSize: 11.5, color: p.hint),
-                          ),
-                        ),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                e.word,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: p.ink,
-                                ),
+                      onTap: () => showDictEntrySheet(context, e),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 11, 10, 11),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 26,
+                              child: Text(
+                                '${index + 1}',
+                                style: TextStyle(fontSize: 11.5, color: p.hint),
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                e.gloss.isEmpty ? '—' : e.gloss,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  color: p.muted,
-                                ),
+                            ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        e.word,
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                          color: p.ink,
+                                        ),
+                                      ),
+                                      if (e.pos.isNotEmpty) ...[
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          e.pos,
+                                          style: TextStyle(
+                                            fontSize: 10.5,
+                                            color: p.hint,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  if (e.example.isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      e.example,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontStyle: FontStyle.italic,
+                                        color: p.hint,
+                                      ),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    e.gloss.isEmpty ? '—' : e.gloss,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      color: p.muted,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              size: 18,
+                              color: p.hint,
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   );
                 },
