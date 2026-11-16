@@ -57,4 +57,37 @@ void main() {
         .join(' ');
     expect(texts.contains('kata0') || texts.contains('kata1'), isTrue);
   });
+
+  testWidgets('第一轮全部答对后能进入第二轮', (tester) async {
+    await _pumpQuiz(tester, _words(3));
+
+    for (var q = 0; q < 3; q++) {
+      final texts = tester
+          .widgetList<Text>(find.byType(Text))
+          .map((t) => t.data ?? '')
+          .toList();
+      final pattern = RegExp(r'^kata[0-9]+$');
+      String shown = '';
+      for (final t in texts) {
+        if (pattern.hasMatch(t)) {
+          shown = t;
+          break;
+        }
+      }
+      expect(shown, isNotEmpty, reason: '第 ${q + 1} 题没找到单词');
+      final index = int.parse(shown.substring(4));
+
+      await tester.tap(find.text('词 $index'));
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.tap(find.textContaining(q == 2 ? '看结果' : '继续'));
+      await tester.pump(const Duration(milliseconds: 250));
+    }
+
+    expect(find.textContaining('第 1 轮结束'), findsOneWidget);
+    await tester.tap(find.textContaining('开始第 2 轮'));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.textContaining('第 2 轮'), findsWidgets);
+    expect(find.textContaining('1/3'), findsWidgets);
+  });
 }

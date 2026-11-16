@@ -79,7 +79,7 @@ class WordQuizScreen extends StatefulWidget {
 
 class _WordQuizScreenState extends State<WordQuizScreen>
     with SingleTickerProviderStateMixin {
-  late final List<WordQuestion> _questions;
+  late List<WordQuestion> _questions;
   late final AnimationController _shake;
 
   int _index = 0;
