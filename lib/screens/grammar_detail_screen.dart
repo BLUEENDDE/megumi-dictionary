@@ -13,6 +13,10 @@ class GrammarDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
+    final related = [
+      for (final id in point.related)
+        if (GrammarStore.byId(id) != null) GrammarStore.byId(id)!,
+    ];
 
     return Scaffold(
       appBar: AppBar(
@@ -123,6 +127,44 @@ class GrammarDetailScreen extends StatelessWidget {
                 ),
               ),
             ),
+            if (related.isNotEmpty) ...[
+              const SizedBox(height: 22),
+              Text(
+                '相关语法',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: p.muted,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final g in related)
+                    GestureDetector(
+                      onTap: () => Navigator.of(context).push(
+                        fadeUpRoute(GrammarDetailScreen(point: g)),
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: p.card,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          g.title,
+                          style: TextStyle(fontSize: 12.5, color: p.primary),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
           ],
         ),
       ),

@@ -16,14 +16,19 @@ class GrammarScreen extends StatefulWidget {
 class _GrammarScreenState extends State<GrammarScreen> {
   String _query = '';
   String _cat = '全部';
+  int _seed = 1;
+
+  bool get _batchMode => _query.trim().isEmpty && _cat == '全部';
 
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
     final cats = ['全部', ...GrammarStore.categories];
-    final list = GrammarStore.search(_query)
-        .where((g) => _cat == '全部' || g.cat == _cat)
-        .toList();
+    final list = _batchMode
+        ? GrammarStore.batch(_seed)
+        : GrammarStore.search(_query)
+            .where((g) => _cat == '全部' || g.cat == _cat)
+            .toList();
 
     return Scaffold(
       body: SafeArea(
@@ -40,18 +45,58 @@ class _GrammarScreenState extends State<GrammarScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            Text(
-              '语法',
-              style: TextStyle(
-                fontSize: 34,
-                height: 1.1,
-                fontWeight: FontWeight.w800,
-                color: p.ink,
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Text(
+                    '语法',
+                    style: TextStyle(
+                      fontSize: 34,
+                      height: 1.1,
+                      fontWeight: FontWeight.w800,
+                      color: p.ink,
+                    ),
+                  ),
+                ),
+                Tooltip(
+                  message: '换一批',
+                  child: Material(
+                    color: p.card,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => setState(() => _seed++),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.refresh_rounded,
+                                size: 17, color: p.primary),
+                            const SizedBox(width: 5),
+                            Text(
+                              '换一批',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: p.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 6),
             Text(
-              '按主题看规则和例句，看完可以直接练习。',
+              '新编印尼语（语法）· 按主题看规则和例句，看完可以直接练习。',
               style: TextStyle(fontSize: 13.5, height: 1.6, color: p.muted),
             ),
             const SizedBox(height: 18),
@@ -106,9 +151,22 @@ class _GrammarScreenState extends State<GrammarScreen> {
               ],
             ),
             const SizedBox(height: 18),
-            Text(
-              '共 ${list.length} 条',
-              style: TextStyle(fontSize: 12.5, color: p.hint),
+            Row(
+              children: [
+                Text(
+                  _batchMode
+                      ? '换一批 · 每次 ${list.length} 条'
+                      : '共 ${list.length} 条',
+                  style: TextStyle(fontSize: 12.5, color: p.hint),
+                ),
+                if (_batchMode) ...[
+                  const Spacer(),
+                  Text(
+                    '共 ${GrammarStore.points.length} 条',
+                    style: TextStyle(fontSize: 12.5, color: p.hint),
+                  ),
+                ],
+              ],
             ),
             const SizedBox(height: 10),
             if (list.isEmpty)

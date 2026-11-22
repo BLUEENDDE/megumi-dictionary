@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/services.dart';
 
@@ -25,7 +26,9 @@ class GrammarPractice {
 
 class GrammarPoint {
   final String id;
+  final String book;
   final String cat;
+  final List<String> related;
   final String title;
   final String summary;
   final String body;
@@ -34,6 +37,8 @@ class GrammarPoint {
 
   const GrammarPoint({
     required this.id,
+    this.book = '新编印尼语（语法）',
+    this.related = const [],
     required this.cat,
     required this.title,
     required this.summary,
@@ -69,6 +74,10 @@ class GrammarStore {
         final map = item as Map<String, dynamic>;
         return GrammarPoint(
           id: (map['id'] as String?) ?? '',
+          book: (map['book'] as String?) ?? '新编印尼语（语法）',
+          related: ((map['related'] as List?) ?? [])
+              .map((e) => e.toString())
+              .toList(),
           cat: (map['cat'] as String?) ?? '其它',
           title: (map['title'] as String?) ?? '',
           summary: (map['summary'] as String?) ?? '',
@@ -109,6 +118,14 @@ class GrammarStore {
           g.examples.any((e) =>
               e.id.toLowerCase().contains(q) || e.cn.contains(q));
     }).toList();
+  }
+
+  /// 按种子抽一批，用于「换一批」。
+  static List<GrammarPoint> batch(int seed, {int count = 8}) {
+    if (_points.isEmpty) return const [];
+    final list = [..._points];
+    list.shuffle(Random(seed));
+    return list.take(count).toList();
   }
 
   static GrammarPoint? byId(String id) {

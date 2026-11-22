@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:indonesia_vocab/screens/grammar_practice_screen.dart';
+import 'package:indonesia_vocab/screens/grammar_screen.dart';
 import 'package:indonesia_vocab/services/grammar_store.dart';
 import 'package:indonesia_vocab/theme/palette.dart';
 
@@ -60,5 +61,59 @@ void main() {
 
     expect(find.textContaining('正确答案是'), findsOneWidget);
     expect(find.text(item.why), findsOneWidget);
+  });
+
+  test('语法归在《新编印尼语（语法）》下', () async {
+    await GrammarStore.load();
+    for (final g in GrammarStore.points) {
+      expect(g.book, '新编印尼语（语法）', reason: g.id);
+    }
+  });
+
+  test('换一批会抽到不同的语法', () async {
+    await GrammarStore.load();
+    final a = GrammarStore.batch(1).map((g) => g.id).toList();
+    final b = GrammarStore.batch(2).map((g) => g.id).toList();
+    expect(a.length, greaterThan(0));
+    expect(a.join(',') == b.join(','), isFalse);
+  });
+
+  test('相关语法的 id 都能解析到条目', () async {
+    await GrammarStore.load();
+    for (final g in GrammarStore.points) {
+      for (final id in g.related) {
+        expect(GrammarStore.byId(id), isNotNull, reason: '${g.id} → $id');
+      }
+    }
+  });
+
+  testWidgets('语法页有换一批按钮，点了会换内容', (tester) async {
+    await GrammarStore.load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Palette.light, Brightness.light),
+        home: const GrammarScreen(),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+
+    final first = tester
+        .widgetList<Text>(find.byType(Text))
+        .map((t) => t.data ?? '')
+        .where((t) => t.length > 4)
+        .join('|');
+
+    expect(find.text('换一批'), findsOneWidget);
+    await tester.tap(find.text('换一批'));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final second = tester
+        .widgetList<Text>(find.byType(Text))
+        .map((t) => t.data ?? '')
+        .where((t) => t.length > 4)
+        .join('|');
+
+    expect(second, isNot(equals(first)));
   });
 }
