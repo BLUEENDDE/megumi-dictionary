@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../services/dictionary.dart';
 import '../services/family_store.dart';
+import '../services/grammar_store.dart';
 import '../services/progress_store.dart';
 import '../services/user_pairs_store.dart';
 import '../theme/palette.dart';
+import 'grammar_screen.dart';
 import 'home_screen.dart';
 import 'settings_screen.dart';
 
-/// 底部两个页签：背词 / 设置。左右滑动也能切。
+/// 底部三个页签：背词 / 语法 / 我的。左右滑动也能切。
 class RootShell extends StatefulWidget {
 
   const RootShell({super.key});
@@ -37,6 +39,7 @@ class _RootShellState extends State<RootShell> {
       _progress.load(),
       _userPairs.load(),
       Dictionary.load(),
+      GrammarStore.load(),
     ]);
     await FamilyStore.load();
     if (mounted) setState(() => _ready = true);
@@ -86,6 +89,7 @@ class _RootShellState extends State<RootShell> {
             progress: _progress,
             userPairs: _userPairs,
           ),
+          const GrammarScreen(),
           SettingsScreen(
             progress: _progress,
             userPairs: _userPairs,
@@ -106,6 +110,11 @@ class _RootShellState extends State<RootShell> {
             icon: Icon(Icons.menu_book_outlined, color: p.muted),
             selectedIcon: Icon(Icons.menu_book_rounded, color: p.primary),
             label: '背词',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.school_outlined, color: p.muted),
+            selectedIcon: Icon(Icons.school_rounded, color: p.primary),
+            label: '语法',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline_rounded, color: p.muted),
