@@ -48,6 +48,11 @@ class _GrammarDetailScreenState extends State<GrammarDetailScreen> {
             ),
             const SizedBox(height: 8),
             Text(
+              '《${widget.point.book}》',
+              style: TextStyle(fontSize: 11.5, color: p.hint),
+            ),
+            const SizedBox(height: 6),
+            Text(
               widget.point.summary,
               style: TextStyle(fontSize: 13.5, height: 1.6, color: p.muted),
             ),

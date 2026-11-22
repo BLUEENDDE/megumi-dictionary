@@ -5,6 +5,7 @@ import '../services/grammar_store.dart';
 import '../theme/palette.dart';
 import '../widgets/ui_kit.dart';
 import 'grammar_detail_screen.dart';
+import 'grammar_history_screen.dart';
 
 /// 语法栏：和背词并列，列表 + 独立搜索。
 class GrammarScreen extends StatefulWidget {
@@ -29,17 +30,6 @@ class _GrammarScreenState extends State<GrammarScreen> {
   Future<void> _loadHistory() async {
     await GrammarHistory.load();
     if (mounted) setState(() => _history = GrammarHistory.ids.toList());
-  }
-
-  /// 浏览历史按分类分组，保持「最近优先」的顺序。
-  Map<String, List<GrammarPoint>> _historyByCat() {
-    final map = <String, List<GrammarPoint>>{};
-    for (final id in _history) {
-      final g = GrammarStore.byId(id);
-      if (g == null) continue;
-      map.putIfAbsent(g.cat, () => []).add(g);
-    }
-    return map;
   }
 
   void _open(GrammarPoint g) async {
@@ -129,67 +119,49 @@ class _GrammarScreenState extends State<GrammarScreen> {
               style: TextStyle(fontSize: 13.5, height: 1.6, color: p.muted),
             ),
             const SizedBox(height: 16),
-            if (_history.isNotEmpty) ...[
-              Row(
-                children: [
-                  Text(
-                    '最近浏览',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                      color: p.muted,
-                    ),
-                  ),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: () async {
-                      await GrammarHistory.clear();
-                      if (mounted) setState(() => _history = const []);
-                    },
-                    child: Text(
-                      '清空',
-                      style: TextStyle(fontSize: 11.5, color: p.hint),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              for (final entry in _historyByCat().entries) ...[
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Text(
-                    entry.key,
-                    style: TextStyle(fontSize: 11, color: p.hint),
-                  ),
+            GestureDetector(
+              onTap: () async {
+                if (_history.isEmpty) return;
+                await Navigator.of(context).push(
+                  fadeUpRoute(const GrammarHistoryScreen()),
+                );
+                await _loadHistory();
+              },
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+                decoration: BoxDecoration(
+                  color: p.card,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: p.divider),
                 ),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                child: Row(
                   children: [
-                    for (final g in entry.value)
-                      GestureDetector(
-                        onTap: () => _open(g),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 11,
-                            vertical: 7,
-                          ),
-                          decoration: BoxDecoration(
-                            color: p.card,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: p.divider),
-                          ),
-                          child: Text(
-                            g.title,
-                            style: TextStyle(fontSize: 12, color: p.ink),
-                          ),
-                        ),
+                    Icon(Icons.history_rounded, size: 17, color: p.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      '最近浏览',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        color: p.ink,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _history.isEmpty ? '暂无记录' : '${_history.length} 条',
+                      style: TextStyle(fontSize: 12, color: p.hint),
+                    ),
+                    const Spacer(),
+                    if (_history.isNotEmpty)
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 18,
+                        color: p.hint,
                       ),
                   ],
                 ),
-                const SizedBox(height: 10),
-              ],
-            ],
+              ),
+            ),
             const SizedBox(height: 14),
             TextField(
               onChanged: (v) => setState(() => _query = v),

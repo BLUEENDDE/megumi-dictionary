@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:indonesia_vocab/screens/grammar_practice_screen.dart';
+import 'package:indonesia_vocab/screens/grammar_history_screen.dart';
 import 'package:indonesia_vocab/screens/grammar_screen.dart';
 import 'package:indonesia_vocab/services/grammar_history.dart';
 import 'package:indonesia_vocab/services/grammar_store.dart';
@@ -144,5 +145,45 @@ void main() {
     final saved = prefs.getStringList('grammar_history_v1');
     expect(saved, isNotNull);
     expect(saved!.first, 'vault-02');
+  });
+
+  test('句型单独成类，多数带例句', () async {
+    await GrammarStore.load();
+    final patterns =
+        GrammarStore.points.where((g) => g.cat == '句型').toList();
+
+    expect(patterns.length, greaterThanOrEqualTo(10));
+    final withExample = patterns.where((g) => g.examples.isNotEmpty).length;
+    expect(withExample, greaterThanOrEqualTo(10));
+
+    for (final g in patterns) {
+      expect(g.title.contains('基本句型数据库'), isFalse);
+    }
+    expect(patterns.any((g) => g.title.contains('S + P + O')), isTrue);
+  });
+
+  testWidgets('最近浏览是入口，点进去按分类分组显示', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await GrammarStore.load();
+    await GrammarHistory.clear();
+
+    // 造两条不同分类的记录
+    final a = GrammarStore.points.firstWhere((g) => g.cat == '词缀');
+    final b = GrammarStore.points.firstWhere((g) => g.cat == '句型');
+    await GrammarHistory.add(a.id);
+    await GrammarHistory.add(b.id);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Palette.light, Brightness.light),
+        home: const GrammarHistoryScreen(),
+      ),
+    );
+    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+
+    expect(find.textContaining('词缀 · '), findsOneWidget);
+    expect(find.textContaining('句型 · '), findsOneWidget);
+    expect(find.text(a.title), findsOneWidget);
+    expect(find.text(b.title), findsOneWidget);
   });
 }
