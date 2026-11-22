@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:indonesia_vocab/screens/grammar_practice_screen.dart';
 import 'package:indonesia_vocab/screens/grammar_screen.dart';
+import 'package:indonesia_vocab/services/grammar_history.dart';
 import 'package:indonesia_vocab/services/grammar_store.dart';
 import 'package:indonesia_vocab/theme/palette.dart';
 
@@ -115,5 +116,33 @@ void main() {
         .join('|');
 
     expect(second, isNot(equals(first)));
+  });
+
+  test('浏览历史最近优先、去重、上限 20 条', () async {
+    SharedPreferences.setMockInitialValues({});
+    await GrammarHistory.clear();
+
+    await GrammarHistory.add('a');
+    await GrammarHistory.add('b');
+    await GrammarHistory.add('a'); // 再看一次，应移到最前
+
+    expect(GrammarHistory.ids.take(2).toList(), ['a', 'b']);
+
+    for (var i = 0; i < 25; i++) {
+      await GrammarHistory.add('x$i');
+    }
+    expect(GrammarHistory.ids.length, GrammarHistory.maxCount);
+    expect(GrammarHistory.ids.first, 'x24');
+  });
+
+  test('浏览历史在重启后仍在（写入本地存储）', () async {
+    SharedPreferences.setMockInitialValues({});
+    await GrammarHistory.clear();
+    await GrammarHistory.add('vault-02');
+
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getStringList('grammar_history_v1');
+    expect(saved, isNotNull);
+    expect(saved!.first, 'vault-02');
   });
 }

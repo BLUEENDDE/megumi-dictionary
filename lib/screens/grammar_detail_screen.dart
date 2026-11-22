@@ -1,33 +1,45 @@
 import 'package:flutter/material.dart';
 
+import '../services/grammar_history.dart';
 import '../services/grammar_store.dart';
 import '../theme/palette.dart';
 import '../widgets/ui_kit.dart';
 import 'grammar_practice_screen.dart';
 
-class GrammarDetailScreen extends StatelessWidget {
+class GrammarDetailScreen extends StatefulWidget {
   final GrammarPoint point;
 
   const GrammarDetailScreen({super.key, required this.point});
 
   @override
+  State<GrammarDetailScreen> createState() => _GrammarDetailScreenState();
+}
+
+class _GrammarDetailScreenState extends State<GrammarDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
+    GrammarHistory.add(widget.point.id);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final p = context.pal;
     final related = [
-      for (final id in point.related)
+      for (final id in widget.point.related)
         if (GrammarStore.byId(id) != null) GrammarStore.byId(id)!,
     ];
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(point.cat, style: const TextStyle(fontSize: 14)),
+        title: Text(widget.point.cat, style: const TextStyle(fontSize: 14)),
       ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
           children: [
             Text(
-              point.title,
+              widget.point.title,
               style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.w800,
@@ -36,7 +48,7 @@ class GrammarDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              point.summary,
+              widget.point.summary,
               style: TextStyle(fontSize: 13.5, height: 1.6, color: p.muted),
             ),
             const SizedBox(height: 18),
@@ -47,11 +59,11 @@ class GrammarDetailScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Text(
-                point.body,
+                widget.point.body,
                 style: TextStyle(fontSize: 14, height: 1.85, color: p.ink),
               ),
             ),
-            if (point.examples.isNotEmpty) ...[
+            if (widget.point.examples.isNotEmpty) ...[
               const SizedBox(height: 20),
               Text(
                 '例句',
@@ -62,7 +74,7 @@ class GrammarDetailScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              for (final e in point.examples)
+              for (final e in widget.point.examples)
                 Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
@@ -108,18 +120,18 @@ class GrammarDetailScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                onPressed: point.practice.isEmpty
+                onPressed: widget.point.practice.isEmpty
                     ? null
                     : () => Navigator.of(context).push(
                           fadeUpRoute(
-                            GrammarPracticeScreen(point: point),
+                            GrammarPracticeScreen(point: widget.point),
                           ),
                         ),
                 icon: const Icon(Icons.edit_note_rounded, size: 18),
                 label: Text(
-                  point.practice.isEmpty
+                  widget.point.practice.isEmpty
                       ? '这一条暂无练习'
-                      : '练习（${point.practice.length} 题）',
+                      : '练习（${widget.point.practice.length} 题）',
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,

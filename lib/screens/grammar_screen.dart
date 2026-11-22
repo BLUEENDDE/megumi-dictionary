@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/grammar_history.dart';
 import '../services/grammar_store.dart';
 import '../theme/palette.dart';
 import '../widgets/ui_kit.dart';
@@ -17,6 +18,34 @@ class _GrammarScreenState extends State<GrammarScreen> {
   String _query = '';
   String _cat = '全部';
   int _seed = 1;
+  List<String> _history = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    await GrammarHistory.load();
+    if (mounted) setState(() => _history = GrammarHistory.ids.toList());
+  }
+
+  /// 浏览历史按分类分组，保持「最近优先」的顺序。
+  Map<String, List<GrammarPoint>> _historyByCat() {
+    final map = <String, List<GrammarPoint>>{};
+    for (final id in _history) {
+      final g = GrammarStore.byId(id);
+      if (g == null) continue;
+      map.putIfAbsent(g.cat, () => []).add(g);
+    }
+    return map;
+  }
+
+  void _open(GrammarPoint g) async {
+    await Navigator.of(context).push(fadeUpRoute(GrammarDetailScreen(point: g)));
+    if (mounted) setState(() => _history = GrammarHistory.ids.toList());
+  }
 
   bool get _batchMode => _query.trim().isEmpty && _cat == '全部';
 
@@ -99,7 +128,69 @@ class _GrammarScreenState extends State<GrammarScreen> {
               '新编印尼语（语法）· 按主题看规则和例句，看完可以直接练习。',
               style: TextStyle(fontSize: 13.5, height: 1.6, color: p.muted),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
+            if (_history.isNotEmpty) ...[
+              Row(
+                children: [
+                  Text(
+                    '最近浏览',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: p.muted,
+                    ),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () async {
+                      await GrammarHistory.clear();
+                      if (mounted) setState(() => _history = const []);
+                    },
+                    child: Text(
+                      '清空',
+                      style: TextStyle(fontSize: 11.5, color: p.hint),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              for (final entry in _historyByCat().entries) ...[
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    entry.key,
+                    style: TextStyle(fontSize: 11, color: p.hint),
+                  ),
+                ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final g in entry.value)
+                      GestureDetector(
+                        onTap: () => _open(g),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 11,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: p.card,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: p.divider),
+                          ),
+                          child: Text(
+                            g.title,
+                            style: TextStyle(fontSize: 12, color: p.ink),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+              ],
+            ],
+            const SizedBox(height: 14),
             TextField(
               onChanged: (v) => setState(() => _query = v),
               style: TextStyle(fontSize: 14, color: p.ink),
@@ -190,9 +281,7 @@ class _GrammarScreenState extends State<GrammarScreen> {
                   borderRadius: BorderRadius.circular(16),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(16),
-                    onTap: () => Navigator.of(context).push(
-                      fadeUpRoute(GrammarDetailScreen(point: g)),
-                    ),
+                    onTap: () => _open(g),
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
                       child: Row(
