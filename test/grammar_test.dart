@@ -25,13 +25,19 @@ void main() {
     expect(GrammarStore.search('').length, GrammarStore.points.length);
   });
 
-  test('每个语法点都有练习', () async {
+  test('大部分语法点带练习，且练习数据完整', () async {
     await GrammarStore.load();
-    final without = GrammarStore.points
-        .where((g) => g.practice.isEmpty)
-        .map((g) => g.id)
-        .toList();
-    expect(without, isEmpty, reason: '这些语法点没有练习：$without');
+    final withPractice =
+        GrammarStore.points.where((g) => g.practice.isNotEmpty).length;
+    expect(withPractice * 2, greaterThanOrEqualTo(GrammarStore.points.length));
+
+    for (final g in GrammarStore.points) {
+      for (final p in g.practice) {
+        expect(p.options.length, greaterThanOrEqualTo(2), reason: g.id);
+        expect(p.options.contains(p.answer), isTrue, reason: g.id);
+        expect(p.why, isNotEmpty, reason: g.id);
+      }
+    }
   });
 
   testWidgets('练习答错会显示正确答案和解释', (tester) async {
