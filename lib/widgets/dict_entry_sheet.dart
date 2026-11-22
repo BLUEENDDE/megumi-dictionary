@@ -4,11 +4,13 @@ import 'package:flutter/services.dart';
 import '../screens/family_screen.dart';
 import '../services/dictionary.dart';
 import '../services/family_store.dart';
+import '../services/raw_dictionary.dart';
 import '../theme/palette.dart';
 import 'ui_kit.dart';
 
 /// 词典条目的详情弹层：词性、释义、例句与翻译。
 void showDictEntrySheet(BuildContext context, DictEntry entry) {
+  RawDictionary.load();
   final p = context.pal;
 
   showModalBottomSheet<void>(
@@ -134,6 +136,34 @@ void showDictEntrySheet(BuildContext context, DictEntry entry) {
                     const SizedBox(height: 6),
                     Text(
                       entry.grammar,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        height: 1.7,
+                        color: bp.muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            if (RawDictionary.of(entry.word) != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                decoration: BoxDecoration(
+                  color: bp.card,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '扫描原文',
+                      style: TextStyle(fontSize: 10.5, color: bp.hint),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      RawDictionary.of(entry.word)!,
                       style: TextStyle(
                         fontSize: 12.5,
                         height: 1.7,
