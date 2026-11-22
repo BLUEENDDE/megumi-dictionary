@@ -86,6 +86,24 @@ class Dictionary {
     } catch (_) {
       _newBase1 = const [];
     }
+    try {
+      final raw = await rootBundle.loadString('assets/newbase2.json');
+      final list = jsonDecode(raw) as List<dynamic>;
+      _newBase2 = list.map((item) {
+        final map = item as Map<String, dynamic>;
+        return DictEntry(
+          word: (map['w'] as String? ?? '').trim(),
+          gloss: (map['g'] as String? ?? '').trim(),
+          page: 0,
+          level: -2,
+          pos: (map['pos'] as String?) ?? '',
+          example: (map['ex'] as String?) ?? '',
+          exampleCn: (map['exc'] as String?) ?? '',
+        );
+      }).where((e) => e.word.isNotEmpty).toList();
+    } catch (_) {
+      _newBase2 = const [];
+    }
     _loaded = true;
   }
 
@@ -147,7 +165,12 @@ class Dictionary {
   /// 《新编基础印尼语一》的 460 条生词
   static List<DictEntry> _newBase1 = const [];
 
+  /// 《新编基础印尼语二》的生词
+  static List<DictEntry> _newBase2 = const [];
+
   static List<DictEntry> get newBase1 => _newBase1;
+
+  static List<DictEntry> get newBase2 => _newBase2;
 
   static Map<String, DictEntry>? _byWord;
 

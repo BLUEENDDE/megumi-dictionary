@@ -25,13 +25,14 @@ class SettingsStore {
     'intermediate': '中级',
     'advanced': '高级',
     'newbase1': '新编基础印尼语一',
+    'newbase2': '新编基础印尼语二',
     'user': '自建词库',
   };
 
   /// 词单分类：基础词库（官方三册）+ 自建词库（以后）
   static const categories = <String, List<String>>{
     '基础词库': ['beginner', 'intermediate', 'advanced'],
-    '教材词库': ['newbase1'],
+    '教材词库': ['newbase1', 'newbase2'],
     '自建词库': ['user'],
   };
 
