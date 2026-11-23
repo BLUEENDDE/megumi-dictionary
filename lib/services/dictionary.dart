@@ -67,14 +67,6 @@ class Dictionary {
       _entries = const [];
     }
     try {
-      final gRaw = await rootBundle.loadString('assets/grammar_notes.json');
-      _grammarNotes = (jsonDecode(gRaw) as Map<String, dynamic>).map(
-        (key, value) => MapEntry(key, value as String),
-      );
-    } catch (_) {
-      _grammarNotes = const {};
-    }
-    try {
       final raw = await rootBundle.loadString('assets/newbase1.json');
       final list = jsonDecode(raw) as List<dynamic>;
       _newBase1 = list.map((item) {
@@ -88,7 +80,7 @@ class Dictionary {
           example: (map['ex'] as String?) ?? '',
           exampleCn: (map['exc'] as String?) ?? '',
           lesson: (map['lesson'] as String?) ?? '',
-          grammar: _grammarNotes[(map['w'] as String? ?? '').trim()] ?? '',
+          grammar: (map['gr'] as String?) ?? '',
         );
       }).where((e) => e.word.isNotEmpty).toList();
     } catch (_) {
@@ -169,13 +161,6 @@ class Dictionary {
 
     return [...prefix, ...contains].take(limit).toList();
   }
-
-  /// 例句语法库：词 -> 语法说明（单独存放，便于扩充与区分）
-  static Map<String, String> _grammarNotes = const {};
-
-  static String grammarOf(String word) => _grammarNotes[word] ?? '';
-
-  static int get grammarNoteCount => _grammarNotes.length;
 
   /// 《新编基础印尼语一》的 460 条生词
   static List<DictEntry> _newBase1 = const [];
