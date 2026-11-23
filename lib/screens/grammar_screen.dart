@@ -42,6 +42,9 @@ class _GrammarScreenState extends State<GrammarScreen> {
   Widget build(BuildContext context) {
     final p = context.pal;
     final cats = ['全部', ...GrammarStore.categories];
+    int countOf(String c) => c == '全部'
+        ? GrammarStore.points.length
+        : GrammarStore.points.where((g) => g.cat == c).length;
     final list = _batchMode
         ? GrammarStore.currentBatch
         : GrammarStore.search(_query)
@@ -197,7 +200,7 @@ class _GrammarScreenState extends State<GrammarScreen> {
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        c,
+                        '$c ${countOf(c)}',
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: _cat == c ? FontWeight.w700 : FontWeight.w400,
