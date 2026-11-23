@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:flutter/services.dart';
 
@@ -55,6 +54,13 @@ class GrammarStore {
 
   static List<GrammarPoint> get points => _points;
 
+  /// 轮转游标 + 当前展示的批次（都放静态里，切页签不会重置）
+  static int _cursor = 0;
+  static List<GrammarPoint> _current = const [];
+
+  static List<GrammarPoint> get currentBatch =>
+      _current.isEmpty ? (_current = nextBatch()) : _current;
+
   static bool get isLoaded => _loaded;
 
   static List<String> get categories {
@@ -70,6 +76,7 @@ class GrammarStore {
     try {
       final raw = await rootBundle.loadString('assets/grammar.json');
       final list = jsonDecode(raw) as List<dynamic>;
+      final seenIds = <String>{};
       _points = list.map((item) {
         final map = item as Map<String, dynamic>;
         return GrammarPoint(
@@ -99,7 +106,7 @@ class GrammarStore {
                   ))
               .toList(),
         );
-      }).toList();
+      }).where((g) => g.id.isEmpty || seenIds.add(g.id)).toList();
     } catch (_) {
       _points = const [];
     }
@@ -120,12 +127,29 @@ class GrammarStore {
     }).toList();
   }
 
-  /// 按种子抽一批，用于「换一批」。
-  static List<GrammarPoint> batch(int seed, {int count = 8}) {
+  /// 换一批：按顺序轮转，批与批之间不重复，走完一遍再从头开始。
+  static List<GrammarPoint> nextBatch({int count = 8}) {
     if (_points.isEmpty) return const [];
-    final list = [..._points];
-    list.shuffle(Random(seed));
-    return list.take(count).toList();
+    final n = _points.length;
+    final size = count >= n ? n : count;
+    final out = <GrammarPoint>[];
+    for (var i = 0; i < size; i++) {
+      out.add(_points[(_cursor + i) % n]);
+    }
+    _cursor = (_cursor + size) % n;
+    return out;
+  }
+
+  /// 「换一批」按钮：取下一批并记住
+  static List<GrammarPoint> shuffleBatch({int count = 8}) {
+    _current = nextBatch(count: count);
+    return _current;
+  }
+
+  /// 测试用：重置轮转状态
+  static void resetRotation() {
+    _cursor = 0;
+    _current = const [];
   }
 
   static GrammarPoint? byId(String id) {

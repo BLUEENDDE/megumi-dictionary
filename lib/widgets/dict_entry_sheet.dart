@@ -4,12 +4,15 @@ import 'package:flutter/services.dart';
 import '../screens/family_screen.dart';
 import '../services/dictionary.dart';
 import '../services/family_store.dart';
+import '../services/history_store.dart';
 import '../services/raw_dictionary.dart';
 import '../theme/palette.dart';
 import 'ui_kit.dart';
 
 /// 词典条目的详情弹层：词性、释义、例句与翻译。
 void showDictEntrySheet(BuildContext context, DictEntry entry) {
+  // 看过的词都记进浏览历史
+  HistoryStore.instance.add(entry.word);
   RawDictionary.load();
   final p = context.pal;
 

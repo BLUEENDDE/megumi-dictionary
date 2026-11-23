@@ -18,7 +18,6 @@ class GrammarScreen extends StatefulWidget {
 class _GrammarScreenState extends State<GrammarScreen> {
   String _query = '';
   String _cat = '全部';
-  int _seed = 1;
   List<String> _history = const [];
 
   @override
@@ -44,7 +43,7 @@ class _GrammarScreenState extends State<GrammarScreen> {
     final p = context.pal;
     final cats = ['全部', ...GrammarStore.categories];
     final list = _batchMode
-        ? GrammarStore.batch(_seed)
+        ? GrammarStore.currentBatch
         : GrammarStore.search(_query)
             .where((g) => _cat == '全部' || g.cat == _cat)
             .toList();
@@ -85,7 +84,7 @@ class _GrammarScreenState extends State<GrammarScreen> {
                     borderRadius: BorderRadius.circular(12),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(12),
-                      onTap: () => setState(() => _seed++),
+                      onTap: () => setState(() => GrammarStore.shuffleBatch()),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,

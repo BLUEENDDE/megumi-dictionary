@@ -72,10 +72,11 @@ void main() {
     }
   });
 
-  test('换一批会抽到不同的语法', () async {
+  test('换一批会换到不同的语法', () async {
     await GrammarStore.load();
-    final a = GrammarStore.batch(1).map((g) => g.id).toList();
-    final b = GrammarStore.batch(2).map((g) => g.id).toList();
+    GrammarStore.resetRotation();
+    final a = GrammarStore.shuffleBatch().map((g) => g.id).toList();
+    final b = GrammarStore.shuffleBatch().map((g) => g.id).toList();
     expect(a.length, greaterThan(0));
     expect(a.join(',') == b.join(','), isFalse);
   });
