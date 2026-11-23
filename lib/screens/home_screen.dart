@@ -347,156 +347,159 @@ class HomeScreenState extends State<HomeScreen> {
     final mastered = _masteredCount;
     final due = _dueCount;
     final total = _levelWords.length;
-    final batch = SettingsStore.learnBatch.value.clamp(1, 100);
-    final words = _unlearnedWords(batch);
+    final searching = _query.isNotEmpty;
+    final rows = searching ? _searchResults : _levelWords;
 
-    return Scaffold(
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+    final header = <Widget>[
+      Text(
+        'MEGUMI · 辞書',
+        style: TextStyle(
+          fontSize: 11,
+          letterSpacing: 1.6,
+          fontWeight: FontWeight.w700,
+          color: p.muted,
+        ),
+      ),
+      const SizedBox(height: 10),
+      Text(
+        '背词',
+        style: TextStyle(
+          fontSize: 34,
+          height: 1.1,
+          fontWeight: FontWeight.w800,
+          color: p.ink,
+        ),
+      ),
+      const SizedBox(height: 6),
+      Text(
+        '一个词一个词地记，右边的小图标能看它的词根关系。',
+        style: TextStyle(fontSize: 13.5, height: 1.6, color: p.muted),
+      ),
+      const SizedBox(height: 18),
+      SizedBox(
+        height: 286,
+        child: PageView(
+          controller: _cards,
+          children: [
+            _SummaryCard(
+              due: due,
+              learned: learned,
+              mastered: mastered,
+              total: total,
+              unlearned: total - learned,
+              listName: _listName,
+              onReview: _startReview,
+              onLearn: _startLearn,
+              onSettings: _openLearnSettings,
+              onPickList: _pickWordList,
+            ),
+            _ProgressCard(
+              mastered: mastered,
+              fresh: total - learned,
+              accuracy: _progress.overallAccuracy,
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 8),
+      Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < 2; i++)
+              Container(
+                width: 6,
+                height: 6,
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                decoration: BoxDecoration(
+                  color: i == 0 ? p.primary : p.divider,
+                  shape: BoxShape.circle,
+                ),
+              ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 18),
+      _SearchBox(controller: _search, onChanged: _onSearch),
+      if (searching) ...[
+        const SizedBox(height: 18),
+        Row(
           children: [
             Text(
-              'MEGUMI · 辞書',
+              '搜索结果',
               style: TextStyle(
-                fontSize: 11,
-                letterSpacing: 1.6,
+                fontSize: 15,
                 fontWeight: FontWeight.w700,
-                color: p.muted,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              '背词',
-              style: TextStyle(
-                fontSize: 34,
-                height: 1.1,
-                fontWeight: FontWeight.w800,
                 color: p.ink,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(width: 8),
             Text(
-              '一个词一个词地记，右边的小图标能看它的词根关系。',
-              style: TextStyle(fontSize: 13.5, height: 1.6, color: p.muted),
+              '${rows.length} 条',
+              style: TextStyle(fontSize: 13, color: p.muted),
             ),
-            const SizedBox(height: 18),
-            SizedBox(
-              height: 286,
-              child: PageView(
-                controller: _cards,
-                children: [
-                  _SummaryCard(
-                    due: due,
-                    learned: learned,
-                    mastered: mastered,
-                    total: total,
-                    unlearned: total - learned,
-                    listName: _listName,
-                    onReview: _startReview,
-                    onLearn: _startLearn,
-                    onSettings: _openLearnSettings,
-                    onPickList: _pickWordList,
-                  ),
-                  _ProgressCard(
-                    mastered: mastered,
-                    fresh: total - learned,
-                    accuracy: _progress.overallAccuracy,
-                  ),
-                ],
+          ],
+        ),
+        const SizedBox(height: 10),
+      ] else ...[
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Text(
+              '词条',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: p.ink,
               ),
             ),
-            const SizedBox(height: 8),
-            Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (var i = 0; i < 2; i++)
-                    Container(
-                      width: 6,
-                      height: 6,
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      decoration: BoxDecoration(
-                        color: i == 0 ? p.primary : p.divider,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                ],
-              ),
+            const SizedBox(width: 8),
+            Text(
+              '共 $total 词',
+              style: TextStyle(fontSize: 13, color: p.muted),
             ),
-            const SizedBox(height: 18),
-            _SearchBox(controller: _search, onChanged: _onSearch),
-            if (_query.isNotEmpty) ...[
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Text(
-                    '搜索结果',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: p.ink,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${_searchResults.length} 条',
-                    style: TextStyle(fontSize: 13, color: p.muted),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              if (_searchResults.isEmpty)
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 28),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: p.card,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
+          ],
+        ),
+        const SizedBox(height: 10),
+      ],
+    ];
+
+    return Scaffold(
+      body: SafeArea(
+        child: CustomScrollView(
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              sliver: SliverList.list(children: header),
+            ),
+            if (rows.isEmpty)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+                sliver: SliverToBoxAdapter(
                   child: Text(
-                    '没找到「${_query.trim()}」',
+                    searching ? '没找到「${_query.trim()}」' : '这个词单还没有词',
                     style: TextStyle(fontSize: 13, color: p.hint),
                   ),
                 ),
-              for (final entry in _searchResults)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _WordTile(
-                    entry: entry,
-                    onTap: () => showDictEntrySheet(context, entry),
-                    onFamily: () => _openFamily(entry.word),
-                  ),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+                sliver: SliverList.builder(
+                  itemCount: rows.length,
+                  itemBuilder: (context, index) {
+                    final entry = rows[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _WordTile(
+                        entry: entry,
+                        onTap: () => showDictEntrySheet(context, entry),
+                        onFamily: () => _openFamily(entry.word),
+                      ),
+                    );
+                  },
                 ),
-            ] else ...[
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Text(
-                    '词条',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: p.ink,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '待学 ${words.length} / $total',
-                    style: TextStyle(fontSize: 13, color: p.muted),
-                  ),
-                ],
               ),
-              const SizedBox(height: 10),
-              for (final entry in words)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _WordTile(
-                    entry: entry,
-                    onTap: () => showDictEntrySheet(context, entry),
-                    onFamily: () => _openFamily(entry.word),
-                  ),
-                ),
-            ],
           ],
         ),
       ),

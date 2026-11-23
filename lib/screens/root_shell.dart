@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/dictionary.dart';
 import '../services/family_store.dart';
+import '../services/history_store.dart';
 import '../services/grammar_store.dart';
 import '../services/progress_store.dart';
 import '../services/user_pairs_store.dart';
@@ -42,6 +43,7 @@ class _RootShellState extends State<RootShell> {
       GrammarStore.load(),
     ]);
     await FamilyStore.load();
+    await HistoryStore.instance.load();
     if (mounted) setState(() => _ready = true);
   }
 

@@ -10,6 +10,7 @@ import '../services/settings_store.dart';
 import '../services/user_pairs_store.dart';
 import '../services/user_words.dart';
 import '../theme/palette.dart';
+import 'history_screen.dart';
 import 'text_import_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -319,6 +320,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _Card(
             child: Column(
               children: [
+                _Tile(
+                  icon: Icons.history_rounded,
+                  title: '浏览历史',
+                  subtitle: '最近看过的 20 个词条',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const HistoryScreen()),
+                  ),
+                ),
                 _Tile(
                   icon: Icons.add_circle_outline_rounded,
                   title: '添加单词',
