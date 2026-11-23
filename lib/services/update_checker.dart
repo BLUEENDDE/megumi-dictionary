@@ -16,8 +16,9 @@ class UpdateInfo {
 
 /// 检查更新：读本仓库的 latest release。
 class UpdateChecker {
+  // /releases/latest 在某些网络下会 404，改用列表取最新一条
   static const _api =
-      'https://api.github.com/repos/BLUENDDE/megumi-dictionary/releases/latest';
+      'https://api.github.com/repos/BLUENDDE/megumi-dictionary/releases';
 
   /// 返回「有新版」时的信息；已是最新或检查失败返回 null。
   static Future<UpdateInfo?> check(String currentVersion) async {
@@ -31,13 +32,21 @@ class UpdateChecker {
       if (res.statusCode != 200) return null;
 
       final body = await res.transform(utf8.decoder).join();
-      final map = jsonDecode(body) as Map<String, dynamic>;
-      final tag = (map['tag_name'] as String? ?? '').replaceAll('v', '').trim();
-      final url = (map['html_url'] as String?) ?? '';
-      final notes = (map['body'] as String?) ?? '';
-      if (tag.isEmpty) return null;
-      if (compareVersions(tag, currentVersion) <= 0) return null;
-      return UpdateInfo(version: tag, url: url, notes: notes);
+      final list = jsonDecode(body) as List<dynamic>;
+      for (final item in list) {
+        final map = item as Map<String, dynamic>;
+        if (map['draft'] == true || map['prerelease'] == true) continue;
+        final tag =
+            (map['tag_name'] as String? ?? '').replaceAll('v', '').trim();
+        if (tag.isEmpty) continue;
+        if (compareVersions(tag, currentVersion) <= 0) return null;
+        return UpdateInfo(
+          version: tag,
+          url: (map['html_url'] as String?) ?? '',
+          notes: (map['body'] as String?) ?? '',
+        );
+      }
+      return null;
     } catch (_) {
       return null;
     } finally {
