@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../app_info.dart';
+import '../services/update_checker.dart';
 import '../models/word_pair.dart';
 import '../services/backup_service.dart';
 import '../services/progress_store.dart';
@@ -399,6 +400,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _InfoRow(label: '已掌握', value: '${widget.progress.trainedPairs} 组'),
                 const SizedBox(height: 10),
                 _InfoRow(label: '版本', value: appVersion),
+                const SizedBox(height: 10),
+                _UpdateRow(currentVersion: appVersion),
               ],
             ),
           ),
@@ -530,6 +533,100 @@ class _InfoRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _UpdateRow extends StatefulWidget {
+  final String currentVersion;
+
+  const _UpdateRow({required this.currentVersion});
+
+  @override
+  State<_UpdateRow> createState() => _UpdateRowState();
+}
+
+class _UpdateRowState extends State<_UpdateRow> {
+  bool _busy = false;
+
+  Future<void> _check() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final info = await UpdateChecker.check(widget.currentVersion);
+    if (!mounted) return;
+    setState(() => _busy = false);
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        final p = context.pal;
+        if (info == null) {
+          return AlertDialog(
+            title: const Text('检查更新'),
+            content: const Text('已是最新版本，或网络暂时不可用。'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('好'),
+              ),
+            ],
+          );
+        }
+        return AlertDialog(
+          title: Text('发现新版本 ${info.version}'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (info.notes.isNotEmpty)
+                  Text(
+                    info.notes,
+                    style: TextStyle(fontSize: 12.5, color: p.muted),
+                  ),
+                const SizedBox(height: 12),
+                Text(
+                  '安装时直接覆盖旧版，数据会保留。',
+                  style: TextStyle(fontSize: 11.5, color: p.hint),
+                ),
+                const SizedBox(height: 10),
+                SelectableText(
+                  info.url,
+                  style: TextStyle(fontSize: 11, color: p.primary),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('关闭'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    return InkWell(
+      onTap: _check,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Text('检查更新', style: TextStyle(fontSize: 13, color: p.muted)),
+            const Spacer(),
+            Text(
+              _busy ? '检查中…' : '点一下检查',
+              style: TextStyle(fontSize: 12.5, color: p.primary),
+            ),
+          ],
+        ),
       ),
     );
   }
