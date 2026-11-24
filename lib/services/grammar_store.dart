@@ -63,6 +63,18 @@ class GrammarStore {
 
   static bool get isLoaded => _loaded;
 
+  /// 书架：按书名分组
+  static List<String> get books {
+    final seen = <String>[];
+    for (final g in _points) {
+      if (!seen.contains(g.book)) seen.add(g.book);
+    }
+    return seen;
+  }
+
+  static List<GrammarPoint> ofBook(String book) =>
+      _points.where((g) => g.book == book).toList();
+
   static List<String> get categories {
     final seen = <String>[];
     for (final g in _points) {
@@ -125,6 +137,19 @@ class GrammarStore {
           g.examples.any((e) =>
               e.id.toLowerCase().contains(q) || e.cn.contains(q));
     }).toList();
+  }
+
+  /// 按书取一批（用于书架模式）：轮转、不重复。
+  static List<GrammarPoint> batch(int seed,
+      {int count = 8, String? book}) {
+    final src = book == null || book.isEmpty ? _points : ofBook(book);
+    if (src.isEmpty) return const [];
+    final start = ((seed - 1) * count) % src.length;
+    final out = <GrammarPoint>[];
+    for (var i = 0; i < (count < src.length ? count : src.length); i++) {
+      out.add(src[(start + i) % src.length]);
+    }
+    return out;
   }
 
   /// 换一批：按顺序轮转，批与批之间不重复，走完一遍再从头开始。

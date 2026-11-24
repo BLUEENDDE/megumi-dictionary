@@ -18,6 +18,11 @@ class GrammarScreen extends StatefulWidget {
 class _GrammarScreenState extends State<GrammarScreen> {
   String _query = '';
   String _cat = '全部';
+  String? _book;
+  int _seed = 1;
+
+  String get _currentBook =>
+      _book ?? (GrammarStore.books.isEmpty ? '' : GrammarStore.books.first);
   List<String> _history = const [];
 
   @override
@@ -31,6 +36,58 @@ class _GrammarScreenState extends State<GrammarScreen> {
     if (mounted) setState(() => _history = GrammarHistory.ids.toList());
   }
 
+  Future<void> _pickBook() async {
+    final p = context.pal;
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: p.bg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        final bp = context.pal;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: bp.divider,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 8),
+              for (final b in GrammarStore.books)
+                ListTile(
+                  leading: Icon(Icons.menu_book_rounded,
+                      size: 18, color: bp.primary),
+                  title: Text(b, style: TextStyle(fontSize: 14, color: bp.ink)),
+                  subtitle: Text(
+                    '${GrammarStore.ofBook(b).length} 条',
+                    style: TextStyle(fontSize: 11.5, color: bp.hint),
+                  ),
+                  trailing: _currentBook == b
+                      ? Icon(Icons.check_rounded, size: 18, color: bp.primary)
+                      : null,
+                  onTap: () => Navigator.of(context).pop(b),
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+    if (picked == null) return;
+    setState(() {
+      _book = picked;
+      _cat = '全部';
+      _seed = 1;
+    });
+  }
+
   void _open(GrammarPoint g) async {
     await Navigator.of(context).push(fadeUpRoute(GrammarDetailScreen(point: g)));
     if (mounted) setState(() => _history = GrammarHistory.ids.toList());
@@ -41,13 +98,18 @@ class _GrammarScreenState extends State<GrammarScreen> {
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
-    final cats = ['全部', ...GrammarStore.categories];
+    final bookPoints = GrammarStore.ofBook(_currentBook);
+    final cats = <String>['全部'];
+    for (final g in bookPoints) {
+      if (!cats.contains(g.cat)) cats.add(g.cat);
+    }
     int countOf(String c) => c == '全部'
-        ? GrammarStore.points.length
-        : GrammarStore.points.where((g) => g.cat == c).length;
+        ? bookPoints.length
+        : bookPoints.where((g) => g.cat == c).length;
     final list = _batchMode
-        ? GrammarStore.currentBatch
+        ? GrammarStore.batch(_seed, book: _currentBook)
         : GrammarStore.search(_query)
+            .where((g) => g.book == _currentBook)
             .where((g) => _cat == '全部' || g.cat == _cat)
             .toList();
 
@@ -87,7 +149,7 @@ class _GrammarScreenState extends State<GrammarScreen> {
                     borderRadius: BorderRadius.circular(12),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(12),
-                      onTap: () => setState(() => GrammarStore.shuffleBatch()),
+                      onTap: () => setState(() => _seed++),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
@@ -121,6 +183,47 @@ class _GrammarScreenState extends State<GrammarScreen> {
               style: TextStyle(fontSize: 13.5, height: 1.6, color: p.muted),
             ),
             const SizedBox(height: 16),
+            GestureDetector(
+              onTap: _pickBook,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+                decoration: BoxDecoration(
+                  color: p.card,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: p.divider),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.menu_book_rounded, size: 17, color: p.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      '语法书',
+                      style: TextStyle(fontSize: 12, color: p.hint),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _currentBook,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: p.ink,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${GrammarStore.ofBook(_currentBook).length} 条',
+                      style: TextStyle(fontSize: 11.5, color: p.hint),
+                    ),
+                    Icon(Icons.chevron_right_rounded,
+                        size: 18, color: p.hint),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
             GestureDetector(
               onTap: () async {
                 if (_history.isEmpty) return;

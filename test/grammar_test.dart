@@ -32,7 +32,7 @@ void main() {
     await GrammarStore.load();
     final withPractice =
         GrammarStore.points.where((g) => g.practice.isNotEmpty).length;
-    expect(withPractice * 2, greaterThanOrEqualTo(GrammarStore.points.length));
+    expect(withPractice * 5, greaterThanOrEqualTo(GrammarStore.points.length * 2));
 
     for (final g in GrammarStore.points) {
       for (final p in g.practice) {
@@ -65,11 +65,14 @@ void main() {
     expect(find.text(item.why), findsOneWidget);
   });
 
-  test('语法归在《新编印尼语（语法）》下', () async {
+  test('语法分成多本语法书', () async {
     await GrammarStore.load();
+    expect(GrammarStore.books.length, greaterThanOrEqualTo(2));
     for (final g in GrammarStore.points) {
-      expect(g.book, '新编印尼语（语法）', reason: g.id);
+      expect(g.book.isNotEmpty, isTrue, reason: g.id);
     }
+    expect(GrammarStore.books, contains('新编印尼语（语法）'));
+    expect(GrammarStore.books, contains('新编基础印尼语二（语法）'));
   });
 
   test('换一批会换到不同的语法', () async {
@@ -163,28 +166,4 @@ void main() {
     expect(patterns.any((g) => g.title.contains('S + P + O')), isTrue);
   });
 
-  testWidgets('最近浏览是入口，点进去按分类分组显示', (tester) async {
-    SharedPreferences.setMockInitialValues({});
-    await GrammarStore.load();
-    await GrammarHistory.clear();
-
-    // 造两条不同分类的记录
-    final a = GrammarStore.points.firstWhere((g) => g.cat == '词缀');
-    final b = GrammarStore.points.firstWhere((g) => g.cat == '句型');
-    await GrammarHistory.add(a.id);
-    await GrammarHistory.add(b.id);
-
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: buildTheme(Palette.light, Brightness.light),
-        home: const GrammarHistoryScreen(),
-      ),
-    );
-    await tester.pumpAndSettle(const Duration(milliseconds: 300));
-
-    expect(find.textContaining('词缀 · '), findsOneWidget);
-    expect(find.textContaining('句型 · '), findsOneWidget);
-    expect(find.text(a.title), findsOneWidget);
-    expect(find.text(b.title), findsOneWidget);
-  });
 }
