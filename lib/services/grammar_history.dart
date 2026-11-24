@@ -1,9 +1,9 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// 语法浏览历史：最近看过的排在前面，最多留 20 条。
+/// 语法浏览历史：最近看过的排在前面，最多留 200 条。
 class GrammarHistory {
   static const _key = 'grammar_history_v1';
-  static const maxCount = 20;
+  static const maxCount = 200;
 
   static final List<String> _ids = [];
   static bool _loaded = false;

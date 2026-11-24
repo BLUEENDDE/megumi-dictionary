@@ -123,7 +123,7 @@ void main() {
     expect(second, isNot(equals(first)));
   });
 
-  test('浏览历史最近优先、去重、上限 20 条', () async {
+  test('浏览历史最近优先、去重、上限提高到 200', () async {
     SharedPreferences.setMockInitialValues({});
     await GrammarHistory.clear();
 
@@ -133,10 +133,12 @@ void main() {
 
     expect(GrammarHistory.ids.take(2).toList(), ['a', 'b']);
 
+    await GrammarHistory.clear();
     for (var i = 0; i < 25; i++) {
       await GrammarHistory.add('x$i');
     }
-    expect(GrammarHistory.ids.length, GrammarHistory.maxCount);
+    // 上限已提高到 200，25 条不会被截断
+    expect(GrammarHistory.ids.length, 25);
     expect(GrammarHistory.ids.first, 'x24');
   });
 
