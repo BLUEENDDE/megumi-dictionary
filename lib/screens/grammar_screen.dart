@@ -252,9 +252,15 @@ class _GrammarScreenState extends State<GrammarScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      _history.isEmpty ? '暂无记录' : '${_history.length} 条',
-                      style: TextStyle(fontSize: 12, color: p.hint),
+                    ValueListenableBuilder<int>(
+                      valueListenable: GrammarHistory.revision,
+                      builder: (context, _, _) {
+                        final n = GrammarHistory.ids.length;
+                        return Text(
+                          n == 0 ? '暂无记录' : '$n 条',
+                          style: TextStyle(fontSize: 12, color: p.hint),
+                        );
+                      },
                     ),
                     const Spacer(),
                     if (_history.isNotEmpty)

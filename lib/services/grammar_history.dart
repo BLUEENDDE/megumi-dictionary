@@ -1,9 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 语法浏览历史：最近看过的排在前面，最多留 200 条。
 class GrammarHistory {
   static const _key = 'grammar_history_v1';
   static const maxCount = 200;
+
+  /// 记录变化次数，界面可监听刷新
+  static final ValueNotifier<int> revision = ValueNotifier<int>(0);
 
   static final List<String> _ids = [];
   static bool _loaded = false;
@@ -30,12 +34,14 @@ class GrammarHistory {
     if (_ids.length > maxCount) {
       _ids.removeRange(maxCount, _ids.length);
     }
+    revision.value++;
     await _save();
   }
 
   static Future<void> clear() async {
     _ids.clear();
     _loaded = true;
+    revision.value++;
     await _save();
   }
 
